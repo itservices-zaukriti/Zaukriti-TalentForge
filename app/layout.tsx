@@ -1,21 +1,20 @@
 import './globals.css'
-import { Inter, Outfit } from 'next/font/google'
+import { Inter } from 'next/font/google'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' })
 
 export const metadata = {
     metadataBase: new URL('https://zaukriti.ai'),
-    title: 'Zaukriti.ai — Build. Prove. Belong.',
+    title: 'Zaukriti AI — Build. Prove. Belong.',
     description: 'A merit-first virtual hackathon to identify real builders for AI & digital platforms.',
     openGraph: {
-        title: 'Zaukriti.ai — Build. Prove. Belong.',
+        title: 'Zaukriti AI — Build. Prove. Belong.',
         description: 'A merit-first virtual hackathon to identify real builders for AI & digital platforms.',
-        images: ['/banner-og.png'], // Placeholder for premium banner
+        images: ['/banner-og.png'], // Placeholder
     },
     twitter: {
         card: 'summary_large_image',
-        title: 'Zaukriti.ai — Build. Prove. Belong.',
+        title: 'Zaukriti AI — Build. Prove. Belong.',
         description: 'A merit-first virtual hackathon to identify real builders for AI & digital platforms.',
         images: ['/banner-og.png'],
     },
@@ -29,7 +28,7 @@ export default function RootLayout({
     children: React.ReactNode
 }) {
     return (
-        <html lang="en" className={`${inter.variable} ${outfit.variable}`}>
+        <html lang="en" className={inter.variable}>
             <body>
                 <Navbar />
                 {children}

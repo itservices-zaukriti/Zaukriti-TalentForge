@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
-import { pushToGoogleSheets } from '@/lib/sheets';
 import { sendConfirmationEmail, sendFailureEmail } from '@/lib/notifications';
 import { generateReferralCodeForApplicant } from '@/lib/referrals';
 import { PLATFORM_CONFIG } from '@/app/utils/config';
@@ -123,19 +122,6 @@ export async function POST(req: NextRequest) {
                     .from('applicants')
                     .update({ referral_code: referralCode })
                     .eq('id', applicant.id);
-            }
-
-            // E. Sync & Confirm Email
-            if (PLATFORM_CONFIG.featureFlags.enableGoogleSheetsSync) {
-                await pushToGoogleSheets({
-                    timestamp: new Date().toISOString(),
-                    id: applicant.id,
-                    name: applicant.full_name,
-                    email: applicant.email,
-                    track: applicant.track,
-                    amount: applicant.amount_paid,
-                    referral_code: referralCode
-                });
             }
 
             if (!alreadyPaid) {
