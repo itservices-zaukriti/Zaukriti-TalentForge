@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
 import { createClient } from '@supabase/supabase-js';
-import { checkEnrollmentStatus, getCurrentPricingFromDB, getPricingConfig } from '@/lib/pricing';
+import {
+    checkEnrollmentStatus,
+    getCurrentPricingFromDB,
+    getPricingConfig
+} from '@/lib/pricing';
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID!,
@@ -10,97 +14,129 @@ const razorpay = new Razorpay({
 
 export async function POST(req: NextRequest) {
     try {
-        const { teamSize, currency = 'INR', receipt, referralCode, email } = await req.json();
+        const {
+            teamSize,
+            currency = 'INR',
+            receipt,
+            referralCode,
+            email,
+        } = await req.json();
 
-        // Initialize Service Role Client for Pricing Logic
-        if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-            throw new Error("Missing service role key");
+        if (!teamSize || !receipt) {
+            return NextResponse.json(
+                { error: 'Missing required fields' },
+                { status: 400 }
+            );
         }
+
+        // --- Supabase Service Role (pricing + enrollment authority)
+        if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
+        }
+
         const supabaseServiceRole = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
 
-        // 1. Check Enrollment
+        // 1️⃣ Check if registrations are open
         const enrollment = await checkEnrollmentStatus(supabaseServiceRole);
         if (!enrollment.isOpen) {
-            return NextResponse.json({ error: enrollment.message }, { status: 400 });
+            return NextResponse.json(
+                { error: enrollment.message },
+                { status: 400 }
+            );
         }
 
-        // 2. Get Pricing from DB
+        // 2️⃣ Fetch active pricing phase
         const pricingData = await getCurrentPricingFromDB(supabaseServiceRole);
         if (!pricingData) {
-            return NextResponse.json({ error: 'Registrations are currently closed (No Phase).' }, { status: 400 });
+            return NextResponse.json(
+                { error: 'Registrations are currently closed (no active phase).' },
+                { status: 400 }
+            );
         }
 
+        const { amounts, phase } = pricingData;
+        const phaseName = phase.phase_name;
+
+        const baseAmount = amounts[String(teamSize)];
+        if (!baseAmount || baseAmount <= 0) {
+            return NextResponse.json(
+                { error: 'Invalid team size selected' },
+                { status: 400 }
+            );
+        }
+
+        // 3️⃣ Pricing configuration (GST, referral discount)
         const pricingConfig = await getPricingConfig(supabaseServiceRole);
-        const { amounts } = pricingData;
 
-        let validatedAmount = amounts[teamSize.toString()] ?? 0;
-
-        if (!validatedAmount) {
-            return NextResponse.json({ error: 'Invalid team size' }, { status: 400 });
-        }
-
-        // Verify Referral and Apply Discount
-        // Check governance
-        const isReferralActive = !process.env.REFERRAL_FREEZE; // Simple env check or config
         let discount = 0;
+        const referralEnabled = !process.env.REFERRAL_FREEZE;
 
-        if (referralCode && email && isReferralActive !== false) {
-            // A. Check Community Code
+        if (referralEnabled && referralCode && email) {
+            // A) Community / Org referral
             if (referralCode.startsWith('CR-')) {
                 const { supabase } = await import('@/lib/supabase');
-                const { data: commRef } = await supabase
+                const { data } = await supabase
                     .from('community_referrers')
                     .select('id')
                     .eq('referral_code', referralCode.toUpperCase())
                     .eq('status', 'active')
                     .maybeSingle();
 
-                if (commRef) discount = pricingConfig.referralDiscount;
+                if (data) {
+                    discount = pricingConfig.referralDiscount;
+                }
             } else {
-                // B. Check Student Code
+                // B) Student referral
                 const { validateReferralCode } = await import('@/lib/referrals');
                 const referrerId = await validateReferralCode(referralCode, email);
-                if (referrerId) discount = pricingConfig.referralDiscount;
+                if (referrerId) {
+                    discount = pricingConfig.referralDiscount;
+                }
             }
         }
 
-        // Pricing Calculation (Master Logic)
-        const discountedPrice = Math.max(0, validatedAmount - discount);
-        const gstRate = pricingConfig.gstPercentage / 100.0;
-        const gstAmount = Math.ceil(discountedPrice * gstRate);
-        const finalAmount = discountedPrice + gstAmount;
+        // 4️⃣ Final pricing calculation
+        const discountedAmount = Math.max(0, baseAmount - discount);
+        const gstRate = pricingConfig.gstPercentage / 100;
+        const gstAmount = Math.ceil(discountedAmount * gstRate);
+        const finalAmount = discountedAmount + gstAmount;
 
-        const options = {
-            amount: finalAmount * 100, // Amount in paise
+        // 5️⃣ Create Razorpay order
+        const order = await razorpay.orders.create({
+            amount: finalAmount * 100, // paise
             currency,
             receipt,
             notes: {
-                base_amount: validatedAmount,
+                pricing_phase: phaseName,
+                base_amount: baseAmount,
                 discount_amount: discount,
                 gst_amount: gstAmount,
-                applicant_id: receipt // Store applicant_id in notes for Webhook retrieval
-            }
-        };
+            },
+        });
 
-        const order = await razorpay.orders.create(options);
-
+        // 6️⃣ Response to frontend
         return NextResponse.json({
             id: order.id,
             amount: order.amount,
             currency: order.currency,
-            key: process.env.RAZORPAY_KEY_ID, // Frontend uses this to initialize checkout
+            key: process.env.RAZORPAY_KEY_ID,
             pricing: {
-                base: validatedAmount,
+                phase: phaseName,
+                base: baseAmount,
                 discount,
                 gst: gstAmount,
-                total: finalAmount
-            }
+                total: finalAmount,
+            },
         });
+
     } catch (error: any) {
-        console.error('Razorpay Order Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('❌ Razorpay Order Error:', error);
+        return NextResponse.json(
+            { error: error?.message || 'Failed to create Razorpay order' },
+            { status: 500 }
+        );
     }
 }
