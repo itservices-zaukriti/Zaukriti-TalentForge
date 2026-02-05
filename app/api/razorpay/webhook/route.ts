@@ -35,79 +35,122 @@ export async function POST(req: NextRequest) {
         );
 
         // 1. Find the applicant
-        const { data: applicant, error: findError } = await supabase
-            .from('applicants')
-            .select('*')
-            .eq('payment_order_id', orderId)
-            .single();
+        // Prefer looking up by ID stored in notes (set during Order Creation)
+        let applicantId = payment.notes?.applicant_id;
 
-        if (findError || !applicant) {
-            console.error('Applicant not found for order:', orderId);
-            return NextResponse.json({ status: 'ok' });
+        let applicantQuery = supabase.from('applicants').select('*');
+
+        if (applicantId) {
+            applicantQuery = applicantQuery.eq('id', applicantId);
+        } else {
+            // Fallback to order_id if notes missing (legacy flow)
+            applicantQuery = applicantQuery.eq('payment_order_id', orderId);
         }
 
-        const alreadyPaid = applicant.payment_status === 'paid';
+        const { data: applicant, error: findError } = await applicantQuery.single();
+
+        if (findError || !applicant) {
+            console.error('Applicant not found for payload:', { orderId, applicantId });
+            // We return 200 to acknowledge webhook, otherwise Razorpay retries
+            return NextResponse.json({ status: 'ok', warning: 'Applicant not found' });
+        }
+
+        const alreadyPaid = applicant.payment_status === 'Paid' || applicant.payment_status === 'paid'; // Case insensitive check
 
         if (event.event === 'payment.captured') {
-            // A. Update Payment Status
+            // A. Update Payment Status (Idempotent update)
             await supabase
                 .from('applicants')
                 .update({
-                    payment_status: 'paid',
-                    application_status: 'active',
+                    payment_status: 'Paid', // Normalize to Title Case or consistency
+                    application_status: 'Active',
                     payment_id: payment.id,
                     payment_signature: signature,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', applicant.id);
 
-            // B. Confirm Referral & Credit Ledger (Check Governance)
-            if (!alreadyPaid && PLATFORM_CONFIG.referral.governance.active && !PLATFORM_CONFIG.referral.governance.emergencyFreeze) {
+            // B. CONFIRM REFERRAL & CREDIT LEDGER (STRICT GOVERNANCE)
+            // Rule: Governance active and not frozen
+            if (PLATFORM_CONFIG.referral.governance.active && !PLATFORM_CONFIG.referral.governance.emergencyFreeze) {
+
+                // --- 1. Resolve Pending Referral ---
                 const { data: referral } = await supabase
                     .from('referrals')
-                    .update({ status: 'confirmed' })
+                    .select('id, referrer_applicant_id, status')
                     .eq('referred_applicant_id', applicant.id)
-                    .select('referrer_applicant_id')
                     .maybeSingle();
 
-                // Standard Referral Credit
-                if (referral?.referrer_applicant_id) {
+                if (referral?.referrer_applicant_id && referral.status !== 'confirmed' && referral.status !== 'void_self_referral') {
+                    // --- 2. STRICT SELF-REFERRAL CHECK ---
+                    // Fetch details of both Referrer and Referee (Applicant)
                     const { data: referrerUser } = await supabase
                         .from('applicants')
-                        .select('user_id, email, full_name')
+                        .select('user_id, email, full_name, phone')
                         .eq('id', referral.referrer_applicant_id)
                         .single();
 
-                    if (referrerUser?.user_id) {
-                        await supabase.from('wallet_ledger').insert([{
-                            user_id: referrerUser.user_id,
-                            registration_id: referral.referrer_applicant_id,
-                            amount: 50,
-                            type: 'credit',
-                            reason: `Referral Bonus: ${applicant.full_name}`
-                        }]);
-                        const { sendReferralRewardEmail } = await import('@/lib/notifications');
-                        await sendReferralRewardEmail(referrerUser.email, referrerUser.full_name, applicant.full_name);
+                    // Referee details are in `applicant` object
+
+                    const isSelfReferral =
+                        (referrerUser?.user_id && referrerUser.user_id === applicant.user_id) || // Same Auth User
+                        (referrerUser?.phone && applicant.phone && referrerUser.phone.replace(/\D/g, '') === applicant.phone.replace(/\D/g, '')); // Same Phone
+
+                    if (isSelfReferral) {
+                        console.warn(`⛔ [FRAUD_BLOCK] Self-referral detected. Payer: ${applicant.id}, CodeOwner: ${referral.referrer_applicant_id}`);
+                        // Mark referral as void/fraud
+                        await supabase
+                            .from('referrals')
+                            .update({ status: 'void_self_referral' })
+                            .eq('id', referral.id);
+                    }
+                    else {
+                        // --- 3. VALID CREDIT ---
+                        // Update status to Confirmed
+                        await supabase
+                            .from('referrals')
+                            .update({ status: 'confirmed' })
+                            .eq('id', referral.id);
+
+                        // Credit Referrer
+                        if (referrerUser?.user_id) {
+                            await supabase.from('wallet_ledger').insert([{
+                                user_id: referrerUser.user_id,
+                                registration_id: referral.referrer_applicant_id,
+                                amount: 50,
+                                type: 'credit',
+                                reason: `Referral Bonus: ${applicant.full_name}`
+                            }]);
+
+                            // Send Email
+                            const { sendReferralRewardEmail } = await import('@/lib/notifications');
+                            await sendReferralRewardEmail(referrerUser.email, referrerUser.full_name, applicant.full_name);
+                        }
                     }
                 }
 
-                // Community Referral Credit
+                // --- 4. COMMUNITY REFERRAL LOGIC ---
+                // (Similar strict checks could be applied if community owners are also users, usually distinct)
+                // Assuming Community Owners are distinct entities for now, but good to be safe.
                 if (PLATFORM_CONFIG.communityReferral.enabled) {
                     const { data: commLink } = await supabase
                         .from('community_referral_links')
-                        .update({ status: 'confirmed' })
+                        .select('id, community_referrer_id, status')
                         .eq('referred_applicant_id', applicant.id)
-                        .select('community_referrer_id')
-                        .maybeSingle();
+                        .maybeSingle(); // Check pending link
 
-                    if (commLink?.community_referrer_id) {
+                    if (commLink?.community_referrer_id && commLink.status !== 'confirmed') {
+                        await supabase
+                            .from('community_referral_links')
+                            .update({ status: 'confirmed' })
+                            .eq('id', commLink.id);
+
                         await supabase.from('community_wallet_ledger').insert([{
                             community_referrer_id: commLink.community_referrer_id,
                             amount: 50,
                             type: 'credit',
                             description: `Referral of ${applicant.full_name} (${applicant.email})`
                         }]);
-                        // Note: We might want a specific email for Community Partners here locally or just rely on dashboard
                     }
                 }
             }

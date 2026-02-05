@@ -22,17 +22,24 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Invalid payment signature' }, { status: 400 });
         }
 
-        // 2. Fetch current status to prevent duplicate notifications
-        const { data: currentApplicant } = await supabase
+        // Initialize Service Role Client to Bypass RLS
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseAdmin = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
+        // 2. Fetch current status (Use Service Role)
+        const { data: currentApplicant } = await supabaseAdmin
             .from('applicants')
             .select('payment_status, email, full_name, track')
             .eq('id', applicant_id)
-            .single();
+            .maybeSingle();
 
         const alreadyPaid = currentApplicant?.payment_status === 'Paid';
 
-        // 3. Update Applicant Record
-        const { data: applicant, error: updateError } = await supabase
+        // 3. Update Applicant Record (Use Service Role)
+        const { data: applicant, error: updateError } = await supabaseAdmin
             .from('applicants')
             .update({
                 payment_status: 'Paid',
@@ -41,82 +48,89 @@ export async function POST(req: NextRequest) {
                 application_status: 'Applied'
             })
             .eq('id', applicant_id)
-            .select()
-            .single();
+            .select() // Returning *
+            .single(); // Here single() is fine if update succeeds on 1 row
 
         if (updateError) throw updateError;
 
-        // 4. Confirm Referral & Credit Ledger (Check Governance)
-        if (!alreadyPaid && PLATFORM_CONFIG.referral.governance.active && !PLATFORM_CONFIG.referral.governance.emergencyFreeze) {
-            const { data: referral } = await supabase
+        // 4. Generate Referral Code (Immediate UI Feedback)
+        let referralCode = applicant.referral_code;
+        if (!referralCode) {
+            // Pass service role client
+            referralCode = await generateReferralCodeForApplicant(applicant.id, supabaseAdmin);
+            if (referralCode) {
+                await supabaseAdmin
+                    .from('applicants')
+                    .update({ referral_code: referralCode })
+                    .eq('id', applicant.id);
+            }
+        }
+
+        // 5. Send Confirmation Email (Immediate Feedback)
+        // We do this here to ensure the user gets the email even if Webhooks fail or are on Localhost.
+        // We check if we already sent it (though usually safe to re-send in edge cases, 
+        // ideally we'd have a 'email_sent' flag, but 'alreadyPaid' check handles most races).
+
+        if (!alreadyPaid) {
+            // Run in background so we don't block the UI response
+            // (In Vercel Serverless, we must await, or use waitUntil. For safety we await).
+            console.log(`📧 [UI_VERIFY] Sending confirmation email to ${applicant.email}...`);
+            await sendConfirmationEmail(applicant.email, applicant.full_name, applicant.track, referralCode || 'PENDING');
+        } else {
+            console.log(`ℹ️ [UI_VERIFY] Email likely already sent (Payment was already marked Paid).`);
+        }
+
+        // 6. CREDIT REFERRAL REWARDS (Localhost/Immediate Support)
+        // We replicate Webhook logic here safely to ensure rewards work even if Webhooks fail.
+        if (!alreadyPaid && PLATFORM_CONFIG.referral.governance.active) {
+            console.log(`💰 [UI_VERIFY] Processing Referral Rewards...`);
+
+            // A. Find Pending Referral
+            const { data: referral } = await supabaseAdmin
                 .from('referrals')
-                .update({ status: 'confirmed' })
-                .eq('referred_applicant_id', applicant_id)
-                .select('referrer_applicant_id, status')
+                .select('id, referrer_applicant_id, status')
+                .eq('referred_applicant_id', applicant.id)
                 .maybeSingle();
 
-            // A. Credit REFERRER (₹50 bonus)
-            if (referral?.referrer_applicant_id) {
-                const { data: referrer } = await supabase
+            if (referral?.referrer_applicant_id && referral.status !== 'confirmed') {
+                // B. Validate Self-Referral
+                const { data: referrerUser } = await supabaseAdmin
                     .from('applicants')
-                    .select('user_id, email, full_name')
+                    .select('user_id, email, full_name, phone')
                     .eq('id', referral.referrer_applicant_id)
                     .single();
 
-                if (referrer?.user_id) {
-                    await supabase.from('wallet_ledger').insert([{
-                        user_id: referrer.user_id,
-                        registration_id: referral.referrer_applicant_id, // For context
-                        amount: 50,
-                        type: 'credit',
-                        reason: `Referral Bonus: ${applicant.full_name}`
-                    }]);
-                    const { sendReferralRewardEmail } = await import('@/lib/notifications');
-                    await sendReferralRewardEmail(referrer.email, referrer.full_name, applicant.full_name);
-                }
-            }
+                const isSelfReferral = (referrerUser?.user_id && referrerUser.user_id === applicant.user_id);
 
-            // B. Credit REFEREE (₹50 instant cashback/joining bonus)
-            if (applicant.user_id) {
-                await supabase.from('wallet_ledger').insert([{
-                    user_id: applicant.user_id,
-                    registration_id: applicant.id,
-                    amount: 50,
-                    type: 'credit',
-                    reason: 'Welcome/Referral Join Bonus'
-                }]);
-            }
+                if (isSelfReferral) {
+                    console.warn(`⛔ [FRAUD] Self-referral blocked in UI Verify.`);
+                    await supabaseAdmin.from('referrals').update({ status: 'void_self_referral' }).eq('id', referral.id);
+                } else {
+                    // C. Confirm Referral
+                    await supabaseAdmin.from('referrals').update({ status: 'confirmed' }).eq('id', referral.id);
 
-            // C. Credit COMMUNITY REFERRER (if applicable)
-            if (PLATFORM_CONFIG.communityReferral.enabled) {
-                const { data: commLink } = await supabase
-                    .from('community_referral_links')
-                    .update({ status: 'confirmed' })
-                    .eq('referred_applicant_id', applicant_id)
-                    .select('community_referrer_id')
-                    .maybeSingle();
+                    // D. Credit Wallet
+                    if (referrerUser?.user_id) {
+                        await supabaseAdmin.from('wallet_ledger').insert([{
+                            user_id: referrerUser.user_id,
+                            registration_id: referral.referrer_applicant_id,
+                            amount: 50,
+                            type: 'credit',
+                            reason: `Referral Bonus: ${applicant.full_name}`
+                        }]);
 
-                if (commLink?.community_referrer_id) {
-                    await supabase.from('community_wallet_ledger').insert([{
-                        community_referrer_id: commLink.community_referrer_id,
-                        amount: 50,
-                        type: 'credit',
-                        description: `Referral of ${applicant.full_name} (${applicant.email})`
-                    }]);
+                        // E. Send Reward Email
+                        const { sendReferralRewardEmail } = await import('@/lib/notifications');
+                        console.log(`📧 [UI_VERIFY] Sending Reward Email to Referrer: ${referrerUser?.email}`);
+                        if (referrerUser?.email) {
+                            await sendReferralRewardEmail(referrerUser.email, referrerUser.full_name, applicant.full_name);
+                        }
+                    }
                 }
             }
         }
 
-        // 5. Generate Referral Code (Post-Payment)
-        let referralCode = '';
-        try {
-            referralCode = await generateReferralCodeForApplicant(applicant_id);
-        } catch (e) { console.error('Code gen failed:', e); }
-
-        // 6. Send Confirmation Email
-        if (!alreadyPaid) {
-            await sendConfirmationEmail(applicant.email, applicant.full_name, applicant.track, referralCode);
-        }
+        console.log(`✅ [UI_VERIFY] Payment verified & Rewards processed for ${applicant_id}.`);
 
         return NextResponse.json({ success: true });
     } catch (error: any) {

@@ -9,11 +9,14 @@ export async function POST(req: NextRequest) {
     try {
         const data = await req.json();
 
-        // 0. CRITICAL: Validate Service Role Key exists
         if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
             console.error("❌ FATAL: SUPABASE_SERVICE_ROLE_KEY is not set in environment variables");
             throw new Error("Server configuration error: Missing service role key");
         }
+
+        // Normalize Phone (Strict 10 digit)
+        const cleanPhone = data.phone.replace(/\D/g, '').slice(-10);
+        data.phone = cleanPhone; // Update data object to use cleaned phone everywhere
 
         // 1. Initialize SERVICE ROLE Client for applicants writes (bypasses RLS)
         const supabaseServiceRole = createClient(
@@ -34,16 +37,25 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Find or Create User Record (using SERVICE_ROLE)
+        // 2. Find or Create User Record (using SERVICE_ROLE)
         console.log("\n🔍 [DB_OP] SELECT users | client=SERVICE_ROLE | filter=email/phone");
-        let { data: user, error: userError } = await supabaseServiceRole
-            .from('users')
-            .select('id')
-            .or(`email.eq.${data.email},phone.eq.${data.phone}`)
-            .maybeSingle();
 
-        if (!user) {
+        let userArg: any = null;
+
+        // Fetch logic: If multiple found (e.g. one matching email, one matching phone - technically shouldn't happen if validated, but safety first), take first.
+        const { data: existingUsers, error: fetchError } = await supabaseServiceRole
+            .from('users')
+            .select('id, full_name, email, phone')
+            .or(`email.eq.${data.email},phone.eq.${data.phone}`)
+            .limit(1);
+
+        if (existingUsers && existingUsers.length > 0) {
+            userArg = existingUsers[0];
+            console.log("✅ [DB_SUCCESS] Found existing user:", userArg.id);
+        }
+
+        if (!userArg) {
             console.log("\n🔍 [DB_OP] INSERT users | client=SERVICE_ROLE | payload_keys=[full_name, email, phone]");
-            console.log("   Payload:", { full_name: data.name, email: data.email, phone: data.phone });
             const { data: newUser, error: createError } = await supabaseServiceRole
                 .from('users')
                 .insert([{
@@ -53,15 +65,40 @@ export async function POST(req: NextRequest) {
                 }])
                 .select('id')
                 .single();
+
             if (createError) {
-                console.error("❌ [DB_ERROR] INSERT users failed:", createError);
-                throw createError;
+                // Handle Race Condition / Duplicate Entry that appeared between Select and Insert
+                if (createError.code === '23505') { // unique_violation
+                    console.warn("⚠️ [DB_RACE_CONDITION] duplicate key on insert, re-fetching user...");
+                    const { data: retryUser } = await supabaseServiceRole
+                        .from('users')
+                        .select('id')
+                        .or(`email.eq.${data.email},phone.eq.${data.phone}`)
+                        .maybeSingle();
+
+                    if (retryUser) {
+                        userArg = retryUser;
+                        console.log("✅ [DB_RECOVERY] Recovered user id:", userArg.id);
+                    } else {
+                        // Truly fatal if we can't find it even after unique error saying it exists.
+                        // Could happen if phone format mismatches? (DB has +91 but constraint hit on normalized?)
+                        // User input was normalized to 10 digits before this block.
+                        // DB constraint likely on raw column.
+                        // If DB has '9966405444', lookup should find it.
+                        console.error("❌ [DB_FATAL] Unique constraint hit but could not find user on retry.");
+                        throw createError;
+                    }
+                } else {
+                    console.error("❌ [DB_ERROR] INSERT users failed:", createError);
+                    throw createError;
+                }
+            } else {
+                console.log("✅ [DB_SUCCESS] INSERT users | id:", newUser?.id);
+                userArg = newUser;
             }
-            console.log("✅ [DB_SUCCESS] INSERT users | id:", newUser?.id);
-            user = newUser;
-        } else {
-            console.log("✅ [DB_SUCCESS] User already exists | id:", user.id);
         }
+
+        const user = userArg;
 
         // 2. Resolve Specialization ID
         const trackCodeMap: Record<string, string> = {
@@ -79,12 +116,19 @@ export async function POST(req: NextRequest) {
             .maybeSingle();
 
         // 3. Prevent Duplicate Specialization Registration
-        const { data: existingReg } = await supabaseServiceRole
+        // If specialization is 'GEN', we must also check the 'track' name to allow
+        // different non-technical tracks (e.g. Marketing vs Creative) to coexist.
+        let dupQuery = supabaseServiceRole
             .from('applicants')
             .select('id')
             .eq('user_id', user.id)
-            .eq('specialization_id', spec?.id)
-            .maybeSingle();
+            .eq('specialization_id', spec?.id);
+
+        if (specCode === 'GEN') {
+            dupQuery = dupQuery.eq('track', data.track);
+        }
+
+        const { data: existingReg } = await dupQuery.maybeSingle();
 
         if (existingReg) {
             return NextResponse.json({ error: `You are already registered for the ${data.track} track.` }, { status: 400 });

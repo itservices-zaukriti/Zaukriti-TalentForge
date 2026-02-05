@@ -1,28 +1,40 @@
 :root {
   /* Core Colors - Calm SaaS Palette (Neutral Grays) */
-  --primary-bg: #ffffff;  /* Pure white */
-  --secondary-bg: #f5f5f5; /* Neutral 100 */
-  --tertiary-bg: #e5e5e5;  /* Neutral 200 */
+  --primary-bg: #ffffff;
+  /* Pure white */
+  --secondary-bg: #f5f5f5;
+  /* Neutral 100 */
+  --tertiary-bg: #e5e5e5;
+  /* Neutral 200 */
 
   /* Brand Colors - Adjusted for Mobile Clarity */
-  --brand-primary: #6366f1; /* Indigo 500 */
-  --brand-secondary: #818cf8; /* Indigo 400 */
-  --brand-dark: #4338ca; /* Indigo 700 */
+  --brand-primary: #6366f1;
+  /* Indigo 500 */
+  --brand-secondary: #818cf8;
+  /* Indigo 400 */
+  --brand-dark: #4338ca;
+  /* Indigo 700 */
   --brand-glow: rgba(99, 102, 241, 0.15);
 
   /* Typography - Neutral Grays (No Blue Tint) */
-  --text-primary: #171717;   /* Neutral 900 */
-  --text-secondary: #525252; /* Neutral 600 */
-  --text-tertiary: #a3a3a3;  /* Neutral 400 */
+  --text-primary: #171717;
+  /* Neutral 900 */
+  --text-secondary: #525252;
+  /* Neutral 600 */
+  --text-tertiary: #a3a3a3;
+  /* Neutral 400 */
 
   /* Accents */
-  --accent-gold: #f59e0b; /* Amber 500 */
-  --accent-success: #10b981; /* Emerald 500 */
-  --accent-error: #ef4444; /* Red 500 */
+  --accent-gold: #f59e0b;
+  /* Amber 500 */
+  --accent-success: #10b981;
+  /* Emerald 500 */
+  --accent-error: #ef4444;
+  /* Red 500 */
 
   /* Glassmorphism - Light Mode */
   --glass-bg: rgba(255, 255, 255, 0.90);
-  --glass-border: rgba(0, 0, 0, 0.06); 
+  --glass-border: rgba(0, 0, 0, 0.06);
   --glass-blur: blur(20px);
 
   /* Shadows */
@@ -42,6 +54,14 @@
 }
 
 /* Global Reset & Safety Net */
+html {
+  scroll-padding-top: 100px;
+  /* Offset for sticky header */
+  scroll-behavior: smooth;
+  /* Smooth scrolling globally */
+}
+
+/* Global Reset & Safety Net */
 html,
 body {
   max-width: 100%;
@@ -52,7 +72,8 @@ body {
   box-sizing: border-box;
   padding: 0;
   margin: 0;
-  max-width: 100%; /* Prevent horizontal overflow */
+  max-width: 100%;
+  /* Prevent horizontal overflow */
 }
 
 /* 1. Body Typography - Inter Only */
@@ -67,7 +88,12 @@ body {
 }
 
 /* 2. Headings - Elegant & Restrained */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-weight: 650;
   letter-spacing: -0.02em;
   color: var(--text-primary);
@@ -171,7 +197,8 @@ a {
   transform: translateY(-2px);
 }
 
-.text-muted, .small-text {
+.text-muted,
+.small-text {
   font-size: 0.875rem;
   color: var(--text-tertiary);
   font-weight: 400;
@@ -183,6 +210,9 @@ a {
   top: 0;
   right: 0;
   height: 100vh;
+  /* Fallback */
+  height: 100dvh;
+  /* Modern mobile browsers */
   width: 80%;
   max-width: 320px;
   background: white;
@@ -190,6 +220,11 @@ a {
   transform: translateX(100%);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 3000;
+  overflow-y: auto;
+  /* Enable scrolling */
+  overflow-x: hidden;
+  padding-bottom: 40px;
+  /* Ensure bottom content isn't flush with edge */
 }
 
 .mobile-nav.open {
@@ -198,8 +233,15 @@ a {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade {
@@ -235,9 +277,17 @@ a {
 }
 
 /* Helper Classes */
-.hidden-mobile { display: block; }
-.hidden-desktop { display: none; }
-.text-brand { color: var(--brand-primary); }
+.hidden-mobile {
+  display: block;
+}
+
+.hidden-desktop {
+  display: none;
+}
+
+.text-brand {
+  color: var(--brand-primary);
+}
 
 /* Responsive Adjustments & Micro-Polish */
 @media (max-width: 768px) {
@@ -245,29 +295,59 @@ a {
     --spacing-lg: 3rem;
     --spacing-xl: 4rem;
   }
-  
-  body { font-size: 15px; }
 
-  h1 { font-size: 2.2rem !important; line-height: 1.2 !important; }
-  h2 { font-size: 1.8rem !important; }
-  h3 { font-size: 1.4rem !important; }
+  body {
+    font-size: 15px;
+  }
 
-  .container { padding: 0 20px; }
-  .hidden-mobile { display: none !important; }
-  .hidden-desktop { display: block !important; }
+  h1 {
+    font-size: 2.2rem !important;
+    line-height: 1.2 !important;
+  }
 
-  .brand-main { font-size: 1rem; }
-  .brand-tagline { font-size: 0.75rem; }
-  .brand-legal { font-size: 0.65rem; }
+  h2 {
+    font-size: 1.8rem !important;
+  }
 
-  .cta-button, .cta-button-secondary {
+  h3 {
+    font-size: 1.4rem !important;
+  }
+
+  .container {
+    padding: 0 20px;
+  }
+
+  .hidden-mobile {
+    display: none !important;
+  }
+
+  .hidden-desktop {
+    display: block !important;
+  }
+
+  .brand-main {
+    font-size: 1rem;
+  }
+
+  .brand-tagline {
+    font-size: 0.75rem;
+  }
+
+  .brand-legal {
+    font-size: 0.65rem;
+  }
+
+  .cta-button,
+  .cta-button-secondary {
     padding: 14px 24px;
     font-size: 0.95rem;
     width: 100%;
     margin-bottom: 10px;
   }
-  
-  .glass-card:hover, .cta-button:hover, .cta-button-secondary:hover {
+
+  .glass-card:hover,
+  .cta-button:hover,
+  .cta-button-secondary:hover {
     transform: none;
     box-shadow: var(--shadow-md);
   }
@@ -277,7 +357,9 @@ a {
 .modal-overlay {
   position: fixed;
   top: 0;
-  left: 0; right: 0; bottom: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(4px);
   z-index: 2000;

@@ -27,27 +27,49 @@ export interface PricingConfig {
 }
 
 /**
- * Fetches the current enrollment status from DB
+ * AUTHORITATIVE UTILITY: Get the Single Active Phase
+ * Rules:
+ * 1. is_active = true
+ * 2. start_date <= now
+ * 3. end_date >= now
+ * 4. If multiple, pick latest start_date
+ */
+export async function getCurrentActivePhase(supabase: SupabaseClient): Promise<PricingPhase | null> {
+    const now = new Date().toISOString();
+
+    const { data: phases, error } = await supabase
+        .from('pricing_phases')
+        .select('*')
+        .eq('is_active', true)
+        .lte('start_date', now)
+        .gte('end_date', now)
+        .order('start_date', { ascending: false }) // Latest start date wins
+        .limit(1);
+
+    if (error || !phases || phases.length === 0) {
+        return null;
+    }
+
+    return phases[0];
+}
+
+/**
+ * Fetches the current enrollment status
+ * STRICTLY uses getCurrentActivePhase logic.
  */
 export async function checkEnrollmentStatus(supabase: SupabaseClient): Promise<EnrollmentStatus> {
-    const { data, error } = await supabase
-        .from('enrollment_control')
-        .select('is_enrollment_open, closed_message')
-        .single();
+    const activePhase = await getCurrentActivePhase(supabase);
 
-    if (error || !data) {
-        console.error("Error fetching enrollment status:", error);
-        // Fallback to OPEN if DB fails? Or CLOSED? 
-        // Safer to Default CLOSED to prevent unauthorized registrations if system is down.
-        // But prompt says "Safe fallback if DB misconfigured".
-        // Let's default to OPEN if table empty, but Log error.
-        // Actually, strictly following "If no active phase... block", implies strictness.
-        return { isOpen: false, message: "System configuration error. Please try again later." };
+    if (!activePhase) {
+        return {
+            isOpen: false,
+            message: "Registrations are currently closed. Please wait for the next cohort."
+        };
     }
 
     return {
-        isOpen: data.is_enrollment_open,
-        message: data.closed_message
+        isOpen: true,
+        message: ""
     };
 }
 
@@ -55,26 +77,13 @@ export async function checkEnrollmentStatus(supabase: SupabaseClient): Promise<E
  * Fetches the currently active pricing phase and its amounts
  */
 export async function getCurrentPricingFromDB(supabase: SupabaseClient) {
-    const now = new Date().toISOString();
+    // 1. Get Active Phase using Authoritative Utility
+    const currentPhase = await getCurrentActivePhase(supabase);
 
-    // 1. Get Active Phase
-    const { data: phases, error: phaseError } = await supabase
-        .from('pricing_phases')
-        .select('*')
-        .eq('is_active', true)
-        .lte('start_date', now)
-        .gte('end_date', now)
-        .order('display_order', { ascending: true })
-        .limit(1);
-
-    if (phaseError || !phases || phases.length === 0) {
-        // Try to find a "Closed" phase or future phase?
-        // If no phase matches NOW, we can't determine price.
-        console.warn("No active pricing phase found for date:", now);
+    if (!currentPhase) {
+        console.warn("⛔ [PRICING] No active phase found.");
         return null;
     }
-
-    const currentPhase = phases[0];
 
     // 2. Get Amounts for this Phase
     const { data: amounts, error: amountError } = await supabase

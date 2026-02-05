@@ -10,13 +10,17 @@ import { PLATFORM_CONFIG } from '@/app/utils/config';
  * Format: ZTF-{TYPE}-{RANDOM6}
  * Example: ZTF-PROF-A9X2KQ
  */
-export async function generateReferralCodeForApplicant(applicantId: string): Promise<string> {
+export async function generateReferralCodeForApplicant(applicantId: string, supabaseClient?: any): Promise<string> {
+    const client = supabaseClient || supabase;
+
     // 1. Get User/Applicant Details for Type Mapping
-    const { data: applicant } = await supabase
+    const { data: applicant } = await client
         .from('applicants')
         .select('specializations(code)')
         .eq('id', applicantId)
         .single();
+
+    // ... (rest of logic uses 'client')
 
     // Map User Type to Short Code
     const typeMap: Record<string, string> = {
@@ -28,8 +32,7 @@ export async function generateReferralCodeForApplicant(applicantId: string): Pro
         'college': 'CLG'
     };
 
-    // Default to STU since user_type is removed from schema
-    // const userType = (applicant as any)?.user_type || 'student';
+    // Default to STU
     let typeCode = 'STU';
 
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Readable chars
@@ -44,7 +47,7 @@ export async function generateReferralCodeForApplicant(applicantId: string): Pro
         }
         code = `ZTF-${typeCode}-${randomPart}`;
 
-        const { data } = await supabase
+        const { data } = await client
             .from('referral_codes')
             .select('id')
             .eq('code', code)
@@ -54,7 +57,7 @@ export async function generateReferralCodeForApplicant(applicantId: string): Pro
         attempts++;
     }
 
-    const { error } = await supabase
+    const { error } = await client
         .from('referral_codes')
         .insert([{ applicant_id: applicantId, code }]);
 

@@ -80,7 +80,8 @@ export async function POST(req: NextRequest) {
             notes: {
                 base_amount: validatedAmount,
                 discount_amount: discount,
-                gst_amount: gstAmount
+                gst_amount: gstAmount,
+                applicant_id: receipt // Store applicant_id in notes for Webhook retrieval
             }
         };
 

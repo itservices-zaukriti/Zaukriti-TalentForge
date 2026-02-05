@@ -35,13 +35,8 @@ export default function CommunityDashboard() {
             if (profile) {
                 setReferrer(profile)
 
-                // 3. Fetch Referral Counts
-                const { count: total } = await supabase
-                    .from('community_referral_links')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('community_referrer_id', profile.id)
-
-                const { count: paid } = await supabase
+                // 3. Fetch Referral Counts (Strictly Confirmed/Paid)
+                const { count: confirmedCount } = await supabase
                     .from('community_referral_links')
                     .select('*', { count: 'exact', head: true })
                     .eq('community_referrer_id', profile.id)
@@ -60,8 +55,8 @@ export default function CommunityDashboard() {
                         return curr.type === 'credit' ? acc + curr.amount : acc - curr.amount;
                     }, 0)
                     setStats({
-                        totalReferrals: total || 0,
-                        paidReferrals: paid || 0,
+                        totalReferrals: 0, // Deprecated/Hidden
+                        paidReferrals: confirmedCount || 0,
                         walletBalance: balance
                     })
                 }
@@ -106,8 +101,7 @@ export default function CommunityDashboard() {
             {/* Stats Overview */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '40px' }}>
                 {[
-                    { label: 'Total Referrals', val: stats.totalReferrals, icon: '👥' },
-                    { label: 'Confirmed (Paid)', val: stats.paidReferrals, icon: '✅' },
+                    { label: 'Successful Registrations', val: stats.paidReferrals, icon: '✅' },
                     { label: 'Wallet Balance', val: `₹${stats.walletBalance}`, icon: '💰' }
                 ].map((stat, i) => (
                     <div key={i} className="glass-card" style={{ padding: '30px' }}>

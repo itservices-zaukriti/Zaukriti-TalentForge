@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { CheckCircle2, ArrowRight, Share2, Linkedin, Facebook, Twitter, Smartphone, Code, Cpu, Database, Layout, X, Zap, HeartPulse, ShoppingBag, Server, Sparkles, Instagram } from 'lucide-react'
+import { CheckCircle2, ArrowRight, Share2, Linkedin, Facebook, Twitter, Smartphone, Code, Cpu, Database, Layout, X, Zap, HeartPulse, ShoppingBag, Server, Sparkles, Instagram, Target, Shield, TrendingUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 // --- CORE PLATFORMS DATA (From DPR) ---
@@ -82,42 +82,63 @@ export default function Home() {
     useEffect(() => {
         async function checkLaunchStatus() {
             try {
-                // Fetch the earliest start date from pricing_phases
-                const { data, error } = await supabase
-                    .from('pricing_phases')
-                    .select('start_date')
-                    .order('start_date', { ascending: true })
-                    .limit(1)
+                // 1. Authoritative Phase Check (API)
+                const ts = new Date().getTime();
+                const statusRes = await fetch(`/api/phase-status?t=${ts}`, {
+                    cache: 'no-store',
+                    headers: { 'Pragma': 'no-cache' }
+                });
 
-                let launchDate = new Date('2026-02-18T00:00:00'); // Default fallback
-
-                if (data && data.length > 0) {
-                    launchDate = new Date(data[0].start_date);
+                let isLive = false;
+                if (statusRes.ok) {
+                    const statusData = await statusRes.json();
+                    if (statusData.isOpen) {
+                        isLive = true;
+                    }
                 }
 
-                const now = new Date();
-                const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
+                if (isLive) {
+                    setStatus({
+                        isLive: true,
+                        label: "Live Now", // Icon handled by UI or we can add emoji here if we remove the span dot
+                        subLabel: "Registrations Open"
+                    });
+                    return;
+                }
 
-                if (now < launchDate) {
+                // 2. If NOT Live, check for UPCOMING (Future) phases to show "Launching on..."
+                // or Default to "Closed"
+                const now = new Date().toISOString();
+                const { data: upcoming } = await supabase
+                    .from('pricing_phases')
+                    .select('start_date')
+                    .gt('start_date', now)
+                    .eq('is_active', true)
+                    .order('start_date', { ascending: true })
+                    .limit(1);
+
+                if (upcoming && upcoming.length > 0) {
+                    const launchDate = new Date(upcoming[0].start_date);
+                    const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
                     setStatus({
                         isLive: false,
-                        label: `🚀 Launching on ${launchDate.toLocaleDateString('en-GB', options)}`,
-                        subLabel: "Registrations Open · Event starts soon"
+                        label: `Launching ${launchDate.toLocaleDateString('en-GB', options)}`,
+                        subLabel: "Registrations opening soon"
                     });
                 } else {
                     setStatus({
-                        isLive: true,
-                        label: "🟢 Live Now",
-                        subLabel: "Event is ongoing"
+                        isLive: false,
+                        label: "Registrations Closed",
+                        subLabel: "Check back for next cohort"
                     });
                 }
+
             } catch (e) {
-                console.error("Failed to fetch launch date", e);
-                // Fallback to default state if error
+                console.error("Failed to fetch launch status", e);
                 setStatus({
                     isLive: false,
-                    label: "🚀 Launching Soon",
-                    subLabel: "Registrations Open"
+                    label: "Registrations Closed",
+                    subLabel: "System Status Unavailable"
                 });
             }
         }
@@ -258,6 +279,9 @@ export default function Home() {
                 position: 'relative',
                 zIndex: 1
             }}>
+                {/* ... (Keep HERO Content exactly as is, just truncated for brevity in prompt blocks if needed, but I will include it all or just the wrapper if I can cut blocks?) */
+                    /* Actually, to be safe, I will reproduce the whole return block reordered. */
+                }
                 <div className="container" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
 
                     {/* Launch Badge */}
@@ -266,15 +290,15 @@ export default function Home() {
                         alignItems: 'center',
                         gap: '10px',
                         padding: '8px 16px',
-                        background: 'rgba(99, 102, 241, 0.08)',
-                        color: 'var(--brand-primary)',
+                        background: status.isLive ? 'rgba(16, 185, 129, 0.1)' : (status.label.includes('Closed') ? 'rgba(239, 68, 68, 0.1)' : 'rgba(99, 102, 241, 0.08)'),
+                        color: status.isLive ? '#10b981' : (status.label.includes('Closed') ? '#ef4444' : 'var(--brand-primary)'),
                         borderRadius: '30px',
                         fontWeight: 600,
                         fontSize: '0.9rem',
                         marginBottom: '30px',
-                        border: '1px solid rgba(99, 102, 241, 0.2)'
+                        border: status.isLive ? '1px solid rgba(16, 185, 129, 0.2)' : (status.label.includes('Closed') ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(99, 102, 241, 0.2)')
                     }}>
-                        <span className="animate-pulse">●</span> {status.label}
+                        <span className={status.isLive ? "animate-pulse" : ""}>●</span> {status.label}
                     </div>
 
                     <h1 style={{
@@ -306,6 +330,9 @@ export default function Home() {
                         <Link href="/apply" className="cta-button">
                             Register for Hackathon
                         </Link>
+                        <Link href="/refer" className="cta-button-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Share2 size={16} /> Refer & Earn
+                        </Link>
                         <Link href="/about" className="cta-button-secondary">
                             Explore Vision
                         </Link>
@@ -329,7 +356,188 @@ export default function Home() {
                 </div>
             </section>
 
-            {/* 2. OUR CORE PLATFORMS (New Section) */}
+            {/* 2. ECOSYSTEM & TRACKS (MOVED UP) */}
+            <section id="tracks" style={{ padding: 'var(--spacing-lg) 0', background: 'var(--secondary-bg)', position: 'relative', zIndex: 1 }}>
+                <div className="container">
+                    <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+                        <h2 style={{ fontSize: '2.5rem', marginBottom: '16px' }}>Hackathon <span style={{ color: 'var(--brand-primary)' }}>Tracks</span></h2>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '700px', margin: '0 auto' }}>
+                            Your background does not limit your selection. Choose your area of capability.
+                        </p>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+                        {[
+                            { id: 'ai-ml', title: 'AI & Intelligence', details: 'OCR, NLP, RAG Systems, Model Tuning', tags: ['Python', 'LLMs'] },
+                            { id: 'fullstack', title: 'Full-Stack Eng', details: 'Next.js 14, Real-time Sync, Scalable Arch', tags: ['React', 'Node'] },
+                            { id: 'iot', title: 'IoT & Smart Systems', details: 'Sensor Fusion, Embedded, Edge Computing', tags: ['C++', 'IoT'] },
+                            { id: 'cloud', title: 'Cloud Platforms', details: 'Serverless, DevOps, Security, Infrastructure', tags: ['AWS', 'Supabase'] },
+                            { id: 'fashion-tech', title: 'Fashion & Beauty Tech', details: 'Virtual Try-On, AI Skin Analysis, Personal Styling', tags: ['GenAI', 'Vision'] },
+                            { id: 'marketing', title: 'Product, Growth & Ops', details: 'Strategy, Sales, Digital Marketing, Operations', tags: ['MBA', 'BBA', 'Arts', 'General'] },
+                        ].map((track, i) => (
+                            <Link key={i} href={`/projects/${track.id}`} className="glass-card link-card" style={{ borderLeft: `4px solid var(--brand-primary)`, display: 'block', textDecoration: 'none', transition: 'transform 0.2s', cursor: 'pointer' }}>
+                                <h4 style={{ marginBottom: '10px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>{track.title} <ArrowRight size={16} style={{ float: 'right', opacity: 0.5 }} /></h4>
+                                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>{track.details}</p>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                    {track.tags.map(tag => (
+                                        <span key={tag} style={{ fontSize: '0.75rem', background: 'var(--tertiary-bg)', padding: '4px 10px', borderRadius: '4px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                            {tag}
+                                        </span>
+                                    ))}
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* 3. PROGRAM CLARITY & TIMELINE (MOVED UP) */}
+            <section id="program-dynamics" style={{ padding: 'var(--spacing-lg) 0', background: 'white', position: 'relative', zIndex: 1 }}>
+                <div className="container">
+                    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                        <h2 style={{ fontSize: '2.5rem', marginBottom: '16px' }}>Program <span style={{ color: 'var(--brand-primary)' }}>Dynamics</span></h2>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>
+                            Transparency is our core value. Here is exactly how the program works.
+                        </p>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
+                        <div className="glass-card" style={{ padding: '30px', borderLeft: '4px solid var(--accent-gold)' }}>
+                            <h4 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>Timeline & Evaluation</h4>
+                            <ul style={{ listStyle: 'none', padding: 0, color: 'var(--text-secondary)', lineHeight: '1.7' }}>
+                                <li style={{ marginBottom: '10px' }}>• <strong>Mar:</strong> Enrolments Close. No exceptions.</li>
+                                <li style={{ marginBottom: '10px' }}>• <strong>Apr:</strong> Problem Statement Submissions.</li>
+                                <li style={{ marginBottom: '10px' }}>• <strong>May:</strong> Internal Evaluation & Code Review.</li>
+                                <li style={{ marginBottom: '10px' }}>• <strong>Jun:</strong> Results & Internship Offers.</li>
+                            </ul>
+                            <Link href="/terms#timeline" style={{ fontSize: '0.85rem', color: 'var(--brand-primary)', textDecoration: 'underline', marginTop: '10px', display: 'inline-block' }}>
+                                View detailed timeline
+                            </Link>
+                        </div>
+                        <div className="glass-card" style={{ padding: '30px', borderLeft: '4px solid var(--brand-primary)' }}>
+                            <h4 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>Fee Structure</h4>
+                            <p style={{ color: 'var(--text-secondary)', lineHeight: '1.7' }}>
+                                Registration fees cover <strong>platform access, evaluation infrastructure, and assessment</strong>. It is NOT a guaranteed job purchase. Selection is 100% merit-based.
+                            </p>
+                        </div>
+                        <div className="glass-card" style={{ padding: '30px', borderLeft: '4px solid #10b981' }}>
+                            <h4 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>Internship & Certification</h4>
+                            <p style={{ color: 'var(--text-secondary)', lineHeight: '1.7' }}>
+                                • <strong>Succeed:</strong> Top performers get paid internships.<br />
+                                • <strong>Learn:</strong> Everyone gets a verified participation certificate.<br />
+                                • <strong>Grow:</strong> Internships are performance-based engagements.
+                            </p>
+                            <div style={{ marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '0.85rem' }}>
+                                <Link href="/terms#certification" style={{ color: 'var(--brand-primary)', textDecoration: 'underline' }}>Certification details</Link>
+                                <Link href="/terms#internship" style={{ color: 'var(--brand-primary)', textDecoration: 'underline' }}>Internship selection criteria</Link>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* 4. VISION & ROADMAP — Strategy (Keep here) */}
+            <section id="vision" style={{ padding: 'var(--spacing-lg) 0', background: 'var(--secondary-bg)', position: 'relative', zIndex: 1 }}>
+                <div className="container">
+                    <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+                        <h2 style={{ fontSize: '2.5rem', marginBottom: '16px' }}>The <span style={{ color: 'var(--brand-primary)' }}>Vision</span></h2>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '700px', margin: '0 auto' }}>
+                            We are not just running a hackathon. We are dismantling the resume-based hiring ecosystem
+                            and replacing it with a <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Proof-of-Work</span> model.
+                        </p>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '60px', alignItems: 'start' }}>
+
+                        {/* LEFT COLUMN: The Philosophy (Why) */}
+                        <div>
+                            <h3 style={{ fontSize: '1.5rem', marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <Target className="text-brand-primary" size={24} />
+                                Our Core Philosophy
+                            </h3>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                                {/* Pillar 1 */}
+                                <div className="glass-card" style={{ padding: '24px', borderLeft: '4px solid var(--brand-primary)' }}>
+                                    <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Shield size={18} color="var(--brand-primary)" /> De-Risked Hiring
+                                    </h4>
+                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                                        Resumes are noisy signals. We evaluate 'Builder DNA' through actual code execution, giving companies a pre-vetted, risk-free talent pipeline.
+                                    </p>
+                                </div>
+
+                                {/* Pillar 2 */}
+                                <div className="glass-card" style={{ padding: '24px', borderLeft: '4px solid #10b981' }}>
+                                    <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Layout size={18} color="#10b981" /> Vertically Integrated
+                                    </h4>
+                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                                        We don't just assess; we build. Our candidates work on our own live platforms (Chef2Restro, VitalHalo), ensuring their experience is production-grade.
+                                    </p>
+                                </div>
+
+                                {/* Pillar 3 */}
+                                <div className="glass-card" style={{ padding: '24px', borderLeft: '4px solid #f59e0b' }}>
+                                    <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <TrendingUp size={18} color="#f59e0b" /> Democratized Opportunity
+                                    </h4>
+                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                                        Talent is distributed; opportunity is not. We bridge this gap by offering elite mentorship and projects to Tier-2/3 city builders.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: The Roadmap (When) */}
+                        <div>
+                            <h3 style={{ fontSize: '1.5rem', marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <Zap className="text-brand-primary" size={24} />
+                                Execution Roadmap
+                            </h3>
+
+                            <div id="roadmap" style={{ position: 'relative', paddingLeft: '10px' }}>
+                                {/* Vertical Line */}
+                                <div style={{ position: 'absolute', left: '29px', top: '10px', bottom: '30px', width: '2px', background: 'var(--glass-border)' }}></div>
+
+                                {[
+                                    { year: '2026', title: 'Phase 1: TalentForge Launch', desc: 'Sourcing 500+ builders. Validating the "No-Resume" hiring model through Pilot-1.', current: true },
+                                    { year: '2027', title: 'Phase 2: SaaS Expansion', desc: 'Scaling Angadi.ai and Chef2Restro to 50+ cities. Opening Ops & Sales tracks.', current: false },
+                                    { year: '2028', title: 'Phase 3: Enterprise Scale', desc: 'Serving 100+ Enterprise Clients with white-labeled assessment pipelines.', current: false },
+                                    { year: '2029', title: 'Phase 4: Global AI Ecosystem', desc: 'Exporting our IP. Global leadership opportunities for our alumni.', current: false }
+                                ].map((item, i) => (
+                                    <div key={i} style={{ display: 'flex', gap: '20px', marginBottom: '30px', position: 'relative' }}>
+                                        {/* Year Bubble */}
+                                        <div style={{
+                                            width: '40px', height: '40px', background: item.current ? 'var(--brand-primary)' : 'var(--primary-bg)',
+                                            color: item.current ? 'white' : 'var(--text-secondary)',
+                                            borderRadius: '50%',
+                                            border: item.current ? 'none' : '2px solid var(--glass-border)',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontWeight: 700, fontSize: '0.75rem', zIndex: 2, flexShrink: 0,
+                                            boxShadow: item.current ? '0 4px 12px rgba(99, 102, 241, 0.4)' : 'none'
+                                        }}>
+                                            {item.year.slice(2)}
+                                        </div>
+
+                                        {/* Content */}
+                                        <div style={{ flex: 1, padding: '0 0 10px 0' }}>
+                                            <h4 style={{ marginBottom: '4px', fontSize: '1rem', color: item.current ? 'var(--brand-primary)' : 'var(--text-primary)' }}>
+                                                {item.title}
+                                                {item.current && <span style={{ marginLeft: '8px', fontSize: '0.65rem', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--brand-primary)', padding: '2px 6px', borderRadius: '4px' }}>CURRENT</span>}
+                                            </h4>
+                                            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{item.desc}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+
+            {/* 5. OUR CORE PLATFORMS (Moved down) */}
             <section style={{ padding: 'var(--spacing-lg) 0', background: 'white', position: 'relative', zIndex: 1 }}>
                 <div className="container">
                     <div style={{ textAlign: 'center', marginBottom: '60px' }}>
@@ -385,163 +593,6 @@ export default function Home() {
                                     </div>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* 3. VISION & ROADMAP — Strategy */}
-            <section id="vision" style={{ padding: 'var(--spacing-lg) 0', background: 'var(--secondary-bg)', position: 'relative', zIndex: 1 }}>
-                <div className="container">
-                    <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-                        <h2 style={{ fontSize: '2.5rem', marginBottom: '16px' }}>The <span style={{ color: 'var(--brand-primary)' }}>Vision</span></h2>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>
-                            This isn't just a hackathon. It's an entry point into our AI product ecosystem.
-                        </p>
-                    </div>
-
-                    {/* Roadmap Timeline */}
-                    <div id="roadmap" style={{ position: 'relative', maxWidth: '800px', margin: '0 auto' }}>
-                        <div style={{ position: 'absolute', left: '20px', top: 0, bottom: 0, width: '2px', background: 'var(--brand-primary)', opacity: 0.2 }}></div>
-
-                        {[
-                            { year: '2026', title: 'AI Labs & Pilots', desc: 'Sourcing 500+ builders. Launching TalentForge.' },
-                            { year: '2027', title: 'SaaS Launch India', desc: 'Scaling Angadi.ai and Chef2Restro across Tier-2 cities.' },
-                            { year: '2028', title: 'Enterprise Scale', desc: 'Serving 100+ Enterprise Clients with custom AI pipelines.' },
-                            { year: '2029', title: 'Global AI', desc: 'White-labeling our automation stack for global markets.' }
-                        ].map((item, i) => (
-                            <div key={i} style={{ display: 'flex', gap: '30px', marginBottom: '40px', position: 'relative' }}>
-                                <div style={{
-                                    width: '40px', height: '40px', background: 'var(--primary-bg)', borderRadius: '50%',
-                                    border: '2px solid var(--brand-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontWeight: 700, fontSize: '0.8rem', zIndex: 2
-                                }}>
-                                    {item.year.slice(2)}
-                                </div>
-                                <div className="glass-card" style={{ flex: 1, padding: '20px' }}>
-                                    <h4 style={{ marginBottom: '8px', fontSize: '1.1rem' }}>{item.title}</h4>
-                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{item.desc}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* 4. CASE STUDY — Trust */}
-            <section style={{ padding: 'var(--spacing-lg) 0', background: 'transparent', position: 'relative', zIndex: 1 }}>
-                <div className="container">
-                    <div className="glass-card" style={{
-                        background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
-                        color: 'white',
-                        border: 'none',
-                        textAlign: 'center',
-                        padding: '60px 40px'
-                    }}>
-                        <div style={{ inlineSize: 'fit-content', margin: '0 auto', background: 'rgba(255,255,255,0.2)', padding: '5px 15px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600, marginBottom: '20px' }}>
-                            PILOT-0 DATA
-                        </div>
-                        <h2 style={{ color: 'white', marginBottom: '20px', fontSize: '2.5rem' }}>Resume-Free Hiring Verified.</h2>
-                        <p style={{ maxWidth: '700px', margin: '0 auto 40px', fontSize: '1.1rem', color: 'rgba(255, 255, 255, 0.95)' }}>
-                            We audited 1,000+ students over 12 months. The result?
-                            <strong style={{ color: 'white' }}> Performance is the only metric that matters.</strong>
-                        </p>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '40px', maxWidth: '800px', margin: '0 auto' }}>
-                            <div>
-                                <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'white' }}>1,000+</div>
-                                <div style={{ fontSize: '0.9rem', opacity: 0.8 }}>Candidates Audited</div>
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'white' }}>12 Mo</div>
-                                <div style={{ fontSize: '0.9rem', opacity: 0.8 }}>Research Duration</div>
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'white' }}>0</div>
-                                <div style={{ fontSize: '0.9rem', opacity: 0.8 }}>Resume Bias</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* 4b. PROGRAM CLARITY & TIMELINE (New) */}
-            <section id="program-dynamics" style={{ padding: 'var(--spacing-lg) 0', background: 'var(--secondary-bg)', position: 'relative', zIndex: 1 }}>
-                <div className="container">
-                    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                        <h2 style={{ fontSize: '2.5rem', marginBottom: '16px' }}>Program <span style={{ color: 'var(--brand-primary)' }}>Dynamics</span></h2>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>
-                            Transparency is our core value. Here is exactly how the program works.
-                        </p>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
-                        <div className="glass-card" style={{ padding: '30px', borderLeft: '4px solid var(--accent-gold)' }}>
-                            <h4 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>Timeline & Evaluation</h4>
-                            <ul style={{ listStyle: 'none', padding: 0, color: 'var(--text-secondary)', lineHeight: '1.7' }}>
-                                <li style={{ marginBottom: '10px' }}>• <strong>Mar:</strong> Enrolments Close. No exceptions.</li>
-                                <li style={{ marginBottom: '10px' }}>• <strong>Apr:</strong> Problem Statement Submissions.</li>
-                                <li style={{ marginBottom: '10px' }}>• <strong>May:</strong> Internal Evaluation & Code Review.</li>
-                                <li style={{ marginBottom: '10px' }}>• <strong>Jun:</strong> Results & Internship Offers.</li>
-                            </ul>
-                            <Link href="/terms#timeline" style={{ fontSize: '0.85rem', color: 'var(--brand-primary)', textDecoration: 'underline', marginTop: '10px', display: 'inline-block' }}>
-                                View detailed timeline
-                            </Link>
-                        </div>
-                        <div className="glass-card" style={{ padding: '30px', borderLeft: '4px solid var(--brand-primary)' }}>
-                            <h4 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>Fee Structure</h4>
-                            <p style={{ color: 'var(--text-secondary)', lineHeight: '1.7' }}>
-                                Registration fees cover <strong>platform access, evaluation infrastructure, and assessment</strong>. It is NOT a guaranteed job purchase. Selection is 100% merit-based.
-                            </p>
-                        </div>
-                        <div className="glass-card" style={{ padding: '30px', borderLeft: '4px solid #10b981' }}>
-                            <h4 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>Internship & Certification</h4>
-                            <p style={{ color: 'var(--text-secondary)', lineHeight: '1.7' }}>
-                                • <strong>Succeed:</strong> Top performers get paid internships.<br />
-                                • <strong>Learn:</strong> Everyone gets a verified participation certificate.<br />
-                                • <strong>Grow:</strong> Internships are performance-based engagements.
-                            </p>
-                            <div style={{ marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '0.85rem' }}>
-                                <Link href="/terms#certification" style={{ color: 'var(--brand-primary)', textDecoration: 'underline' }}>Certification details</Link>
-                                <Link href="/terms#internship" style={{ color: 'var(--brand-primary)', textDecoration: 'underline' }}>Internship selection criteria</Link>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-
-
-            {/* 5. ECOSYSTEM & TRACKS */}
-            <section id="tracks" style={{ padding: 'var(--spacing-lg) 0', background: 'var(--secondary-bg)', position: 'relative', zIndex: 1 }}>
-                <div className="container">
-                    <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-                        <h2 style={{ fontSize: '2.5rem', marginBottom: '16px' }}>Hackathon <span style={{ color: 'var(--brand-primary)' }}>Tracks</span></h2>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>
-                            Choose your specialized track to contribute to our platforms.
-                        </p>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-                        {[
-                            { id: 'ai-ml', title: 'AI & Intelligence', details: 'OCR, NLP, RAG Systems, Model Tuning', tags: ['Python', 'LLMs'] },
-                            { id: 'fullstack', title: 'Full-Stack Eng', details: 'Next.js 14, Real-time Sync, Scalable Arch', tags: ['React', 'Node'] },
-                            { id: 'iot', title: 'IoT & Smart Systems', details: 'Sensor Fusion, Embedded, Edge Computing', tags: ['C++', 'IoT'] },
-                            { id: 'cloud', title: 'Cloud Platforms', details: 'Serverless, DevOps, Security, Infrastructure', tags: ['AWS', 'Supabase'] },
-                            { id: 'fashion-tech', title: 'Fashion & Beauty Tech', details: 'Virtual Try-On, AI Skin Analysis, Personal Styling', tags: ['GenAI', 'Vision'] },
-                            { id: 'marketing', title: 'Product & Growth', details: 'Digital Marketing, Analytics, Sales, Franchise Networks & Strategy', tags: ['Figma', 'Analytics', 'Strategy'] },
-                        ].map((track, i) => (
-                            <Link key={i} href={`/projects/${track.id}`} className="glass-card link-card" style={{ borderLeft: `4px solid var(--brand-primary)`, display: 'block', textDecoration: 'none', transition: 'transform 0.2s', cursor: 'pointer' }}>
-                                <h4 style={{ marginBottom: '10px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>{track.title} <ArrowRight size={16} style={{ float: 'right', opacity: 0.5 }} /></h4>
-                                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>{track.details}</p>
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                    {track.tags.map(tag => (
-                                        <span key={tag} style={{ fontSize: '0.75rem', background: 'var(--tertiary-bg)', padding: '4px 10px', borderRadius: '4px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                                            {tag}
-                                        </span>
-                                    ))}
-                                </div>
-                            </Link>
                         ))}
                     </div>
                 </div>

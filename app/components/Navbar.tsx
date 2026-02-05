@@ -19,7 +19,7 @@ export default function Navbar() {
 
             // ScrollSpy Logic (Only relevant on Home Page where sections exist)
             if (pathname === '/') {
-                const sections = ['hackathon', 'tracks', 'vision', 'roadmap']
+                const sections = ['hackathon', 'tracks', 'program-dynamics', 'vision']
                 let current = ''
 
                 // Check Home first (top of page)
@@ -53,12 +53,10 @@ export default function Navbar() {
 
     const navLinks = [
         { name: 'Home', href: '/', id: '' },
-        { name: 'Hackathon', href: '/#hackathon', id: 'hackathon' },
-        { name: 'Tracks', href: '/#tracks', id: 'tracks' },
+        { name: 'Talent Tracks', href: '/#tracks', id: 'tracks' },
         { name: 'How It Works', href: '/#program-dynamics', id: 'program-dynamics' },
-        { name: 'About', href: '/about', id: 'about-page' },
         { name: 'Vision', href: '/#vision', id: 'vision' },
-        { name: 'Roadmap', href: '/#roadmap', id: 'roadmap' },
+        { name: 'About', href: '/about', id: 'about-page' },
         { name: 'Contact', href: '/contact', id: 'contact-page' },
     ]
 
@@ -180,7 +178,7 @@ export default function Navbar() {
             {/* Mobile Drawer */}
             <div
                 className={`mobile-nav ${isMenuOpen ? 'open' : ''}`}
-                style={{ padding: '24px', display: 'flex', flexDirection: 'column', position: 'fixed', zIndex: 2000 }}
+                style={{ padding: '24px 24px 80px 24px', display: 'flex', flexDirection: 'column', position: 'fixed', zIndex: 2000 }}
             >
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '40px' }}>
                     <button
