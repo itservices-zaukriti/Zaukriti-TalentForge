@@ -720,6 +720,13 @@ export default function ApplyClient() {
               {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : `Pay ₹${formData.amount}`}
             </button>
 
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'center', marginTop: '12px', lineHeight: '1.4' }}>
+              By registering, you agree to our{' '}
+              <Link href="/terms" target="_blank" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>Terms & Conditions</Link>,{' '}
+              <Link href="/privacy" target="_blank" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>Privacy Policy</Link>, and{' '}
+              <Link href="/refund-policy" target="_blank" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>Refund Policy</Link>.
+            </p>
+
             <button onClick={handlePrev} style={{ width: '100%', marginTop: '20px', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem' }}>
               Back to edits
             </button>

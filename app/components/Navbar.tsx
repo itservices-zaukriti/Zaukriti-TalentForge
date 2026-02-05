@@ -55,6 +55,7 @@ export default function Navbar() {
         { name: 'Home', href: '/', id: '' },
         { name: 'Hackathon', href: '/#hackathon', id: 'hackathon' },
         { name: 'Tracks', href: '/#tracks', id: 'tracks' },
+        { name: 'How It Works', href: '/#program-dynamics', id: 'program-dynamics' },
         { name: 'About', href: '/about', id: 'about-page' },
         { name: 'Vision', href: '/#vision', id: 'vision' },
         { name: 'Roadmap', href: '/#roadmap', id: 'roadmap' },

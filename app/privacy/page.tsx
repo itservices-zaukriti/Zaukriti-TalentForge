@@ -24,6 +24,9 @@ export default function PrivacyPage() {
                     <p>
                         <strong>6. Rights & Consent:</strong> By registering, you consent to this processing. You may request data deletion once the recruitment cycle for the current hackathon cohort is complete.
                     </p>
+                    <p>
+                        <strong>7. Payment Security:</strong> All financial transactions are processed via <strong>Razorpay</strong>, a secure PCI-DSS compliant gateway. Zaukriti does not store card details, UPI pins, or banking passwords.
+                    </p>
                 </div>
                 <div style={{ marginTop: '30px', textAlign: 'center' }}>
                     <Link href="/apply" className="cta-button">Back to Registration</Link>

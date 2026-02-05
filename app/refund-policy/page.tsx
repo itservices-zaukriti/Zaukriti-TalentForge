@@ -15,6 +15,12 @@ export default function RefundPage() {
                     <p>
                         <strong>3. Double Payments:</strong> Verified duplicate transactions due to technical gateway errors will be reported within 24 hours for a reconciliation and refund of the excess amount.
                     </p>
+                    <p>
+                        <strong>4. Timeline-Based Restrictions:</strong> Registration fees are non-refundable once the evaluation phase begins or after the enrolment window closes (End of March), whichever is earlier.
+                    </p>
+                    <p>
+                        <strong>5. Performance Disclaimer:</strong> Refunds are NOT granted for non-selection in internships, inability to complete problem statements, or personal scheduling conflicts. Evaluation outcomes are final and binding.
+                    </p>
                 </div>
                 <div style={{ marginTop: '30px', textAlign: 'center' }}>
                     <Link href="/apply" className="cta-button">Back to Registration</Link>

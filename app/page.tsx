@@ -465,6 +465,53 @@ export default function Home() {
                 </div>
             </section>
 
+            {/* 4b. PROGRAM CLARITY & TIMELINE (New) */}
+            <section id="program-dynamics" style={{ padding: 'var(--spacing-lg) 0', background: 'var(--secondary-bg)', position: 'relative', zIndex: 1 }}>
+                <div className="container">
+                    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                        <h2 style={{ fontSize: '2.5rem', marginBottom: '16px' }}>Program <span style={{ color: 'var(--brand-primary)' }}>Dynamics</span></h2>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>
+                            Transparency is our core value. Here is exactly how the program works.
+                        </p>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
+                        <div className="glass-card" style={{ padding: '30px', borderLeft: '4px solid var(--accent-gold)' }}>
+                            <h4 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>Timeline & Evaluation</h4>
+                            <ul style={{ listStyle: 'none', padding: 0, color: 'var(--text-secondary)', lineHeight: '1.7' }}>
+                                <li style={{ marginBottom: '10px' }}>• <strong>Mar:</strong> Enrolments Close. No exceptions.</li>
+                                <li style={{ marginBottom: '10px' }}>• <strong>Apr:</strong> Problem Statement Submissions.</li>
+                                <li style={{ marginBottom: '10px' }}>• <strong>May:</strong> Internal Evaluation & Code Review.</li>
+                                <li style={{ marginBottom: '10px' }}>• <strong>Jun:</strong> Results & Internship Offers.</li>
+                            </ul>
+                            <Link href="/terms#timeline" style={{ fontSize: '0.85rem', color: 'var(--brand-primary)', textDecoration: 'underline', marginTop: '10px', display: 'inline-block' }}>
+                                View detailed timeline
+                            </Link>
+                        </div>
+                        <div className="glass-card" style={{ padding: '30px', borderLeft: '4px solid var(--brand-primary)' }}>
+                            <h4 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>Fee Structure</h4>
+                            <p style={{ color: 'var(--text-secondary)', lineHeight: '1.7' }}>
+                                Registration fees cover <strong>platform access, evaluation infrastructure, and assessment</strong>. It is NOT a guaranteed job purchase. Selection is 100% merit-based.
+                            </p>
+                        </div>
+                        <div className="glass-card" style={{ padding: '30px', borderLeft: '4px solid #10b981' }}>
+                            <h4 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>Internship & Certification</h4>
+                            <p style={{ color: 'var(--text-secondary)', lineHeight: '1.7' }}>
+                                • <strong>Succeed:</strong> Top performers get paid internships.<br />
+                                • <strong>Learn:</strong> Everyone gets a verified participation certificate.<br />
+                                • <strong>Grow:</strong> Internships are performance-based engagements.
+                            </p>
+                            <div style={{ marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '0.85rem' }}>
+                                <Link href="/terms#certification" style={{ color: 'var(--brand-primary)', textDecoration: 'underline' }}>Certification details</Link>
+                                <Link href="/terms#internship" style={{ color: 'var(--brand-primary)', textDecoration: 'underline' }}>Internship selection criteria</Link>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+
             {/* 5. ECOSYSTEM & TRACKS */}
             <section id="tracks" style={{ padding: 'var(--spacing-lg) 0', background: 'var(--secondary-bg)', position: 'relative', zIndex: 1 }}>
                 <div className="container">
@@ -500,6 +547,64 @@ export default function Home() {
                 </div>
             </section>
 
+            {/* 5b. REFERRAL PROGRAM (New - After Tracks) */}
+            <section style={{ padding: 'var(--spacing-lg) 0', background: 'white', position: 'relative', zIndex: 1 }}>
+                <div className="container">
+                    <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+                        <h2 style={{ fontSize: '2.5rem', marginBottom: '16px' }}>Detailed <span style={{ color: 'var(--brand-primary)' }}>Referral Program</span></h2>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>
+                            An honest, performance-based reward system for helping us find talent.
+                            <br />
+                            <Link href="/terms#referral" style={{ fontSize: '0.9rem', color: 'var(--brand-primary)', textDecoration: 'underline', marginTop: '8px', display: 'inline-block' }}>
+                                Referral Program Details
+                            </Link>
+                        </p>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '30px' }}>
+                        {/* Individual */}
+                        <div className="glass-card">
+                            <h3 style={{ fontSize: '1.25rem', marginBottom: '10px' }}>Individual Participants</h3>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '15px' }}>
+                                Registered participants get a unique code.
+                            </p>
+                            <ul style={{ paddingLeft: '20px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                                <li><strong>₹50 Credit</strong> for every successful paid referral.</li>
+                                <li>Unlimited rewards based on performance.</li>
+                                <li>High performers get public recognition & badges.</li>
+                            </ul>
+                        </div>
+
+                        {/* Organization */}
+                        <div className="glass-card">
+                            <h3 style={{ fontSize: '1.25rem', marginBottom: '10px' }}>Campus & Organizations</h3>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '15px' }}>
+                                For Colleges, Mentors, and Communities.
+                            </p>
+                            <ul style={{ paddingLeft: '20px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                                <li><strong>₹50 Credit</strong> per participant.</li>
+                                <li>Official Ecosystem Partner status.</li>
+                                <li>Priority access to future cohorts.</li>
+                                <li><strong>Not MLM:</strong> This is a direct recognition program.</li>
+                            </ul>
+                        </div>
+
+                        {/* Partner */}
+                        <div className="glass-card">
+                            <h3 style={{ fontSize: '1.25rem', marginBottom: '10px' }}>Referral Partners</h3>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '15px' }}>
+                                Non-participants who want to evangelize.
+                            </p>
+                            <ul style={{ paddingLeft: '20px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                                <li>Collaborate on future initiatives.</li>
+                                <li>Receive website recognition.</li>
+                                <li>Build community influence.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* 6. SHARE & CTA */}
             <section style={{ padding: 'var(--spacing-lg) 0', background: 'white', position: 'relative', zIndex: 1 }}>
                 <div className="container" style={{ textAlign: 'center' }}>
@@ -526,21 +631,53 @@ export default function Home() {
             </section>
 
             {/* FOOTER */}
-            <footer style={{ padding: '40px 0', background: 'white', borderTop: '1px solid var(--glass-border)', position: 'relative', zIndex: 1 }}>
-                <div className="container" style={{ textAlign: 'center' }}>
+            <footer style={{ padding: '60px 0', background: 'white', borderTop: '1px solid var(--glass-border)', position: 'relative', zIndex: 1 }}>
+                <div className="container">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '40px', marginBottom: '40px' }}>
 
-                    <div className="brand-stack" style={{ alignItems: 'center', marginBottom: '16px' }}>
-                        <div className="brand-main">Zaukriti AI</div>
-                        <div className="brand-tagline">AI Software Development</div>
-                        <div className="brand-legal">Zaukriti Events Private Limited</div>
+                        {/* 1. Brand & Legal */}
+                        <div>
+                            <div className="brand-stack" style={{ marginBottom: '16px' }}>
+                                <div className="brand-main" style={{ fontSize: '1.2rem', fontWeight: 700 }}>Zaukriti AI</div>
+                                <div className="brand-legal" style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>Zaukriti Events Private Limited</div>
+                            </div>
+                            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                                Visakhapatnam, India<br />
+                                DPIIT Recognized
+                            </p>
+                        </div>
+
+                        {/* 2. Company */}
+                        <div>
+                            <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px' }}>Company</h4>
+                            <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <li><Link href="/about" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>About Us</Link></li>
+                                <li><Link href="/contact" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Contact Support</Link></li>
+                            </ul>
+                        </div>
+
+                        {/* 3. Programs */}
+                        <div>
+                            <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px' }}>Programs</h4>
+                            <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <li><Link href="/#program-dynamics" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>How It Works</Link></li>
+                                <li><Link href="/terms#referral" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Referral Program</Link></li>
+                            </ul>
+                        </div>
+
+                        {/* 4. Legal */}
+                        <div>
+                            <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px' }}>Legal</h4>
+                            <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <li><Link href="/terms" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Terms & Conditions</Link></li>
+                                <li><Link href="/privacy" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Privacy Policy</Link></li>
+                                <li><Link href="/refund-policy" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Refund & Cancellation</Link></li>
+                            </ul>
+                        </div>
                     </div>
 
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginBottom: '20px' }}>
-                        Visakhapatnam, India · DPIIT Recognized
-                    </p>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', fontSize: '0.9rem' }}>
-                        {/* Legal Footers */}
-                        <div style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>© Zaukriti AI · Confidential & Proprietary</div>
+                    <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '20px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
+                        © {new Date().getFullYear()} Zaukriti AI · Confidential & Proprietary · All Rights Reserved
                     </div>
                 </div>
             </footer>
