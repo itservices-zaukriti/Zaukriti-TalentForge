@@ -891,7 +891,7 @@ export default function ApplyClient() {
                             />
                             {!isReferralVerified ? (
                               <button
-                                onClick={verifyReferralCode}
+                                onClick={() => verifyReferralCode()}
                                 disabled={!formData.applied_referral_code || isCheckingReferral}
                                 style={{
                                   padding: '0 20px',
