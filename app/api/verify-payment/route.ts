@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
         // 2. Fetch current status (Use Service Role)
         const { data: currentApplicant } = await supabaseAdmin
             .from('applicants')
-            .select('payment_status, email, full_name, track')
+            .select('payment_status, email, full_name, track, phone')
             .eq('id', applicant_id)
             .maybeSingle();
 
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
             // Run in background so we don't block the UI response
             // (In Vercel Serverless, we must await, or use waitUntil. For safety we await).
             console.log(`📧 [UI_VERIFY] Sending confirmation email to ${applicant.email}...`);
-            await sendConfirmationEmail(applicant.email, applicant.full_name, applicant.track, referralCode || 'PENDING');
+            await sendConfirmationEmail(applicant.email, applicant.full_name, applicant.track, referralCode || 'PENDING', applicant.phone);
         } else {
             console.log(`ℹ️ [UI_VERIFY] Email likely already sent (Payment was already marked Paid).`);
         }

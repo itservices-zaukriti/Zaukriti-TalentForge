@@ -7,6 +7,8 @@ import { useSearchParams } from 'next/navigation'
 import { getReferralStats } from '@/lib/referrals'
 import { supabase } from '@/lib/supabase'
 import { Loader2, CheckCircle, AlertCircle, User, Users, GraduationCap, MapPin, Briefcase, Lock, Share2, Linkedin, Facebook, Twitter, Instagram, X } from 'lucide-react'
+import { EligibilitySection, DomainAccordionSection } from './ApplyUI'
+import { CAREER_DOMAINS } from '@/lib/content_data'
 
 // Extended Global Definition for Razorpay
 declare global {
@@ -16,6 +18,20 @@ declare global {
 }
 
 // Placeholder icons for missing Lucide ones (if any) or use Lucide generics
+const ALLOWED_DEGREES = [
+  "B.Tech / B.E.",
+  "M.Tech / M.E.",
+  "BCA",
+  "MCA",
+  "B.Sc",
+  "M.Sc",
+  "B.Com",
+  "M.Com",
+  "BBA",
+  "MBA",
+  "Other Graduation"
+];
+
 const WhatsAppIcon = ({ size, color }: { size: number, color?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -122,7 +138,7 @@ export default function ApplyClient() {
 
     // Track & Team
     teamSize: '1',
-    track: 'ai-ml',
+    track: '', // Initialize to empty to force user selection and avoid legacy 'ai-ml' mismatch
     member2: { name: '', email: '', phone: '' },
     member3: { name: '', email: '', phone: '' },
 
@@ -131,7 +147,9 @@ export default function ApplyClient() {
     // Other
     amount: 0,
     applied_referral_code: '',
-    consent: false
+    consent: false,
+    role: '',
+    customRole: ''
   })
 
   const [isReferralVerified, setIsReferralVerified] = useState(false)
@@ -312,6 +330,9 @@ export default function ApplyClient() {
       }
 
       if (!data.whatsapp.trim()) errors.whatsapp = "WhatsApp Number is required"
+      if (!data.track) errors.track = "Product/Domain is required"
+      if (data.track && !data.role) errors.role = "Role is required"
+      if (data.role === 'other' && !data.customRole) errors.role = "Please specify your role"
     }
 
     if (currentStep === 2) {
@@ -383,10 +404,12 @@ export default function ApplyClient() {
       ...formData,
       // Family Data collected is null since step was removed
       familyData: {
-        guardian_name: null,
         guardian_profession: null,
         income_range: null
-      }
+      },
+      // Pass Role as primary_stream (mapped in backend or passed directly)
+      // Actually let's pass it as a custom field "role" and let backend handle it
+      role: formData.role === 'other' ? formData.customRole : formData.role
     }
 
     try {
@@ -470,8 +493,18 @@ export default function ApplyClient() {
         },
         modal: {
           ondismiss: function () {
-            setIsSubmitting(false)
-            setPaymentStatus('failed')
+            console.log('Payment cancelled/closed by user');
+            setIsSubmitting(false);
+            setPaymentStatus('failed'); // We can use 'failed' or 'cancelled' depending on type. Existing likely uses 'failed'.
+
+            // Auto-trigger "Payment Pending" reminder
+            fetch('/api/send-payment-reminder', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ applicantId })
+            }).catch(err => console.error("Failed to trigger reminder", err));
+
+            alert("Payment was cancelled. We have saved your application. Check your email/WhatsApp for a link to resume payment later.");
           }
         }
       }
@@ -640,6 +673,10 @@ export default function ApplyClient() {
       ) : (
         <>
           {step < 4 && <PricingTable phases={pricingPhases} currentPhase={currentPhase} />}
+
+          {/* Enhanced Content Sections (Step 1 Only) */}
+          {step === 1 && <EligibilitySection />}
+          {step === 1 && <DomainAccordionSection />}
           <div className="glass-card" style={{ padding: '40px' }}>
 
             {/* STEP 1: Personal + Track */}
@@ -673,55 +710,57 @@ export default function ApplyClient() {
                     {renderError('whatsapp')}
                   </div>
                   <div>
-                    <label style={labelStyle}>Select Track</label>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--brand-primary)', marginBottom: '8px' }}>* Your background does not limit your selection.</p>
-                    <select
-                      style={inputStyle}
-                      value={formData.track === 'other' || !['ai-ml', 'fullstack', 'data-science', 'cybersecurity', 'cloud', 'fashion-tech', 'marketing', 'creative', 'diploma', 'general'].includes(formData.track) ? 'other' : formData.track}
-                      onChange={e => {
-                        const val = e.target.value;
-                        if (val === 'other') {
-                          handleInputChange('track', ''); // Clear it so they can type
-                          // We need a way to know "Other" mode is active.
-                          // Actually, a simpler way: keep 'track' as 'other' in a temp state or just use a separate variable?
-                          // Let's use a hidden UI state, or just check if the selected value is 'other'. 
-                          // But wait, if I set formData.track to '', the select might default to first option?
-                          // Let's stick to: if select is 'other', we show input.
-                          // We need a separate state for "isCustomTrack" or we can just infer it.
-                          // Let's just set the select to 'other' value and have a secondary actual input field update the REAL formData?
-                          // No, formData.track IS the payload.
-                          // Better approach: 
-                          // If user selects 'other' -> set formData.track = 'other' (as a marker initially, or just empty string?)
-                          // But if formData.track is 'other', validation might fail if we require a specific set? No, it's open string.
-                          // Let's set it to 'other' string initially.
-                          handleInputChange('track', 'other');
-                        } else {
-                          handleInputChange('track', val);
-                        }
-                      }}
-                    >
-                      <option value="ai-ml">AI & Intelligence</option>
-                      <option value="fullstack">Full-Stack Engineering</option>
-                      <option value="data-science">Data Science</option>
-                      <option value="cybersecurity">Cybersecurity</option>
-                      <option value="cloud">Cloud Computing</option>
-                      <option value="fashion-tech">Fashion & Beauty Tech</option>
-                      <option value="marketing">Product, Growth & Ops (MBA/BBA)</option>
-                      <option value="creative">Creative Design & Arts</option>
-                      <option value="diploma">Diploma / Vocational Track</option>
-                      <option value="general">General Management (B.Com/Others)</option>
-                      <option value="other">Other (Enter Manually)</option>
-                    </select>
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={labelStyle}>Select Product / Domain <span style={{ color: 'red' }}>*</span></label>
+                      <select
+                        style={inputStyle}
+                        value={formData.track}
+                        onChange={e => {
+                          handleInputChange('track', e.target.value);
+                          handleInputChange('role', ''); // Reset role when track changes
+                        }}
+                      >
+                        <option value="">-- Choose a Product --</option>
+                        {CAREER_DOMAINS.map(domain => (
+                          <option key={domain.id} value={domain.slug}>{domain.title}</option>
+                        ))}
+                      </select>
+                      {renderError('track')} {/* Assuming we add track validation error key if empty/invalid */}
+                    </div>
 
-                    {(formData.track === 'other' || (formData.track && !['ai-ml', 'fullstack', 'data-science', 'cybersecurity', 'cloud', 'fashion-tech', 'marketing', 'creative', 'diploma', 'general'].includes(formData.track))) && (
-                      <input
-                        style={{ ...inputStyle, marginTop: '-4px', borderColor: 'var(--brand-primary)' }}
-                        placeholder="Please specify your track..."
-                        // If it's literally the string 'other', show empty. Else show the value.
-                        value={formData.track === 'other' ? '' : formData.track}
-                        onChange={e => handleInputChange('track', e.target.value)}
-                        autoFocus
-                      />
+                    {/* Dynamic Role Selection - Always Render if Track Selected */}
+                    {formData.track && formData.track !== '' && (
+                      <div className="animate-fade" style={{ marginBottom: '16px' }}>
+                        <label style={labelStyle}>Select Role / Sub-Track <span style={{ color: 'red' }}>*</span></label>
+                        {/* Safe Access to Domain Title */}
+                        <p style={{ fontSize: '0.75rem', color: 'var(--brand-primary)', marginBottom: '8px' }}>
+                          * Select the role you want to apply for within the <b>{CAREER_DOMAINS.find(d => d.slug === formData.track)?.title || 'Selected Domain'}</b> team.
+                        </p>
+                        <select
+                          style={inputStyle}
+                          value={formData.role || ''}
+                          onChange={e => handleInputChange('role', e.target.value)}
+                        >
+                          <option value="">-- Choose Your Role --</option>
+                          {/* Safe Access to Roles Array */}
+                          {(CAREER_DOMAINS.find(d => d.slug === formData.track)?.roles || []).map((role, idx) => (
+                            <option key={idx} value={role}>{role}</option>
+                          ))}
+                          <option value="other">Other (Specify below)</option>
+                        </select>
+                        {renderError('role')}
+                      </div>
+                    )}
+
+                    {formData.role === 'other' && (
+                      <div className="animate-fade" style={{ marginBottom: '16px' }}>
+                        <input
+                          style={inputStyle}
+                          placeholder="Please specify your role..."
+                          value={formData.customRole || ''}
+                          onChange={e => handleInputChange('customRole', e.target.value)}
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
@@ -751,7 +790,16 @@ export default function ApplyClient() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                   <div>
                     <label style={labelStyle}>Course / Degree <span style={{ color: 'red' }}>*</span></label>
-                    <input style={inputStyle} placeholder="B.Tech, BCA, etc." value={formData.course} onChange={e => handleInputChange('course', e.target.value)} />
+                    <select
+                      style={inputStyle}
+                      value={formData.course}
+                      onChange={e => handleInputChange('course', e.target.value)}
+                    >
+                      <option value="">-- Select Degree --</option>
+                      {ALLOWED_DEGREES.map((deg, i) => (
+                        <option key={i} value={deg}>{deg}</option>
+                      ))}
+                    </select>
                     {renderError('course')}
                   </div>
                   <div>
@@ -953,7 +1001,9 @@ export default function ApplyClient() {
                       <div style={{ marginBottom: '24px' }}>
                         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '0.85rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                           <input type="checkbox" style={{ marginTop: '4px' }} checked={formData.consent} onChange={e => handleInputChange('consent', e.target.checked)} />
-                          <span>I declare that all information provided is true. I understand that selection is based on merit and performance in the Hackathon.</span>
+                          <span>
+                            I confirm I am 18+ and enrolled in/completed a <strong>Graduation/Engineering</strong> degree. I consent to the processing of my data for evaluation & hiring in accordance with the <strong>DPDP Act</strong>.
+                          </span>
                         </label>
                         {renderError('consent')}
                       </div>

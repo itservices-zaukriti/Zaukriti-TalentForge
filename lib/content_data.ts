@@ -1,0 +1,186 @@
+// Updated Eligibility: Minimum Graduation (Engineering/Arts/Science) Required. School/Intermediate removed.
+export const ELIGIBILITY_CRITERIA = [
+    { label: "Age", value: "18+ Years" },
+    { label: "Education", value: "Minimum Graduation (Pursuing/Completed)" },
+    { label: "Academics", value: "Minimum 6.0 CGPA (or 60%) in current degree." },
+    { label: "Degree", value: "B.Tech, B.E., BCA, MCA, B.Sc, B.Com, BA, MBBS, Nursing, Design, Hotel Management or equivalent." },
+    { label: "Restriction", value: "Intermediate (12th) & School Students are NOT eligible.", isWarning: true }
+];
+
+export const CAREER_DOMAINS = [
+    {
+        id: "ai",
+        title: "TalentForge AI (Prompt & Models)",
+        slug: "ai",
+        forWho: "Degree students. BA / BSc / BCom / Engineering. Anyone who can think clearly and explain things.",
+        work: "Writing prompts that solve real problems. Improving AI responses using examples. Creating structured instructions for bots. Testing AI outputs.",
+        learn: "ChatGPT / Gemini, Google Docs, Notion, Simple spreadsheets.",
+        output: "Prompt libraries, Instruction datasets, AI conversation flows, Problem–solution writeups.",
+        reason: "AI systems don’t fail because of code—they fail because instructions are unclear. Good prompt writers are the bridge between humans and machines.",
+        icon: "BrainCircuit",
+        image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=800&q=80",
+        gradient: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+        roles: ["Prompt Engineer", "AI Logic Designer", "Linguist / Language Expert", "Full Stack Developer", "AI/ML Engineer"]
+    },
+    {
+        id: "fullstack",
+        title: "TalentForge Core (Full Stack & Cloud)",
+        slug: "fullstack",
+        forWho: "CS/IT Students. BTech / MCA. Serious coders.",
+        work: "Building scalable APIs. Designing database schemas (Supabase). Creating responsive Next.js frontends. Implementing real-time features.",
+        learn: "Next.js, TypeScript, Supabase (PostgreSQL), TailwindCSS, Git.",
+        output: "Production-ready web apps, Secure API endpoints, Real-time dashboards.",
+        reason: "The world runs on web software. We need builders who can ship features, not just write syntax.",
+        icon: "Code",
+        image: "https://images.unsplash.com/photo-1605379399642-870262d3d051?auto=format&fit=crop&w=800&q=80",
+        gradient: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+        roles: ["Frontend Architect (Next.js)", "Backend Developer (Node/Supabase)", "DevOps Engineer", "Database Specialist"]
+    },
+    {
+        id: "chef",
+        title: "Chef2Restro (Modern Hospitality OS)",
+        slug: "chef2restro",
+        forWho: "Hotel Management students. Chefs, cooks, food lovers. Anyone with real kitchen or menu knowledge.",
+        work: "Writing standardized recipes. Explaining cooking steps clearly. Creating menu descriptions. Helping AI understand food categories.",
+        learn: "Google Docs, Canva, Mobile camera (optional), AI tools for formatting.",
+        output: "Recipe datasets, Menu intelligence content, Food preparation guides, Local cuisine documentation.",
+        reason: "Restaurants struggle to digitize because food knowledge lives in people’s heads. You help convert experience into structured intelligence.",
+        icon: "Utensils",
+        image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=80",
+        gradient: "linear-gradient(135deg, #f59e0b 0%, #b45309 100%)",
+        roles: ["Culinary Expert / Chef", "Menu Planner", "Hospitality Ops Lead", "Full Stack Developer", "AI/ML Engineer"]
+    },
+    {
+        id: "retail",
+        title: "Angadi.ai (Hyperlocal Commerce)",
+        slug: "angadi",
+        forWho: "Commerce students. Kirana shop family members. Sales, billing, inventory experience holders.",
+        work: "Describing products clearly. Categorizing local goods. Writing usage & pricing explanations. Helping AI understand small business workflows.",
+        learn: "Google Sheets, Docs, Basic AI tools, Mobile photos.",
+        output: "Product catalogs, Retail datasets, Local commerce workflows, Buyer–seller explanations.",
+        reason: "India runs on small shops. But software rarely understands them. You help AI understand the street-level economy.",
+        icon: "ShoppingBag",
+        image: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80",
+        gradient: "linear-gradient(135deg, #10b981 0%, #047857 100%)",
+        roles: ["Retail Operations Specialist", "Inventory Manager", "Local Commerce Analyst", "Full Stack Developer", "Data Scientist"]
+    },
+    {
+        id: "fashion",
+        title: "VelvetLens (AI Fashion & Beauty)",
+        slug: "fashion",
+        forWho: "Fashion design students. Beauticians, stylists. Creative thinkers with aesthetic sense.",
+        work: "Matching designs to personalities. Writing style recommendations. Explaining fabrics, colors, fits. Supporting AI-based fashion suggestions.",
+        learn: "Canva, Pinterest references, AI design tools, Simple writing tools.",
+        output: "Style guides, Look recommendations, Personality-based fashion datasets, Visual + text explanations.",
+        reason: "Fashion is not random — it’s context + personality + purpose. You help systems understand human expression, not trends alone.",
+        icon: "Shirt",
+        image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=800&q=80",
+        gradient: "linear-gradient(135deg, #ec4899 0%, #be185d 100%)",
+        roles: ["Fashion Designer / Stylist", "Trend Analyst", "Visual Merchandiser", "Full Stack Developer", "Computer Vision Engineer"]
+    },
+    {
+        id: "health",
+        title: "VitalHalo (Smart Clinic Ecosystem)",
+        slug: "vitalhalo",
+        forWho: "BSc Nursing. GNM / ANM. MBBS students. Healthcare support staff.",
+        work: "Explaining symptoms in simple language. Structuring medical information. Helping AI avoid dangerous assumptions. Annotating health-related content.",
+        learn: "Docs, Medical references, AI tools (strictly supervised).",
+        output: "Patient-friendly explanations, Medical knowledge annotations, Healthcare workflow descriptions.",
+        reason: "Healthcare AI must be safe, explainable, and responsible. Medical knowledge without clarity can harm. You bring ground truth and ethics.",
+        icon: "Stethoscope",
+        image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80",
+        gradient: "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)",
+        roles: ["Doctor / Medical Student", "Nurse / GNM (SME)", "Clinical Data Specialist", "Full Stack Developer", "AI Engineer (Healthcare)"]
+    },
+    {
+        id: "marketing",
+        title: "Growth & Virality Engines",
+        slug: "marketing",
+        forWho: "Any stream. Social media users. Creative communicators.",
+        work: "Writing captions. Creating reel ideas. Explaining why content works. Helping AI learn engagement patterns.",
+        learn: "Instagram, Canva, AI caption tools, Analytics basics.",
+        output: "Reels scripts, Content strategies, Growth experiments, Marketing datasets.",
+        reason: "Marketing is communication, not manipulation. You help systems learn what connects with people.",
+        icon: "TrendingUp",
+        image: "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=800&q=80",
+        gradient: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+        roles: ["Content Creator / Storyteller", "Growth Hacker", "Social Media Stategist", "Full Stack Developer", "Data Analyst"]
+    },
+    {
+        id: "voice",
+        title: "Music Learning Coach (Voice & Lang)",
+        slug: "music-language",
+        forWho: "Singers. Language learners. Teachers. Anyone who understands sound or language patterns.",
+        work: "Pronunciation guidance. Practice structures. Voice feedback logic. Language simplification.",
+        learn: "Audio recordings, Docs, AI voice tools (analysis only).",
+        output: "Practice frameworks, Language learning aids, Voice improvement guidance.",
+        reason: "AI struggles with tone, rhythm, and nuance. Humans teach machines how expression really works.",
+        icon: "Mic",
+        image: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=800&q=80",
+        gradient: "linear-gradient(135deg, #f43f5e 0%, #be123c 100%)",
+        roles: ["Musician / Vocalist", "Language Teacher", "Audio Engineer", "Full Stack Developer", "AI Engineer (Audio/Speech)"]
+    },
+    {
+        id: "education",
+        title: "Education & Content Systems",
+        slug: "education",
+        forWho: "Teachers. B.Ed students. Tutors. Subject experts.",
+        work: "Curriculum design. Quiz generation. Explainer scripts. Structuring lessons.",
+        learn: "LMS tools, Quizizz, Instructional Design basics.",
+        output: "Micro-learning modules, Structured quizzes, Lesson plans.",
+        reason: "Education scales when content is structured. You help convert knowledge into learnable formats.",
+        icon: "BookOpen",
+        image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=800&q=80",
+        gradient: "linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)",
+        roles: ["Teacher / Subject Expert", "Instructional Designer", "EdTech Product Specialist", "Full Stack Developer", "AI Engineer (NLP)"]
+    },
+    {
+        id: "finance",
+        title: "FinBot (GST & Accounting Intelligence)",
+        slug: "finance",
+        forWho: "BCom / MCom. Tally users. Accounting assistants. GST practitioners.",
+        work: "Explaining invoices. Structuring expense logic. Teaching AI GST rules. Breaking finance into steps.",
+        learn: "Excel / Sheets, Tally (conceptual), Docs, AI explanation tools.",
+        output: "Accounting workflows, Finance explanations, Tax logic datasets.",
+        reason: "Finance software fails when logic isn’t human-readable. You help turn rules into understandable systems.",
+        icon: "Calculator",
+        image: "https://images.unsplash.com/photo-1544377193-33dcf4d68fb5?auto=format&fit=crop&w=800&q=80",
+        gradient: "linear-gradient(135deg, #64748b 0%, #334155 100%)",
+        roles: ["Chartered Accountant / Finance Expert", "Tax / GST Practitioner", "Accounting Workflow Analyst", "Full Stack Developer", "FinTech Engineer"]
+    },
+    {
+        id: "iot",
+        title: "Zaukriti IoT (Industrial Automation)",
+        slug: "iot",
+        forWho: "ECE / EEE Students. Hobbyists. Makers.",
+        work: "Designing custom PCBs. Programming ESP32/Arduinos. Integrating industrial sensors. Edge AI deployment.",
+        learn: "KiCAD, C++, Embedded C, MQTT, Basic Electronics.",
+        output: "Smart sensor nodes, Automated control logic, Industrial dashboards.",
+        reason: "Software is powerful, but hardware moves the real world. We build the senses and muscles of the operation.",
+        icon: "Cpu",
+        image: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80",
+        gradient: "linear-gradient(135deg, #475569 0%, #1e293b 100%)",
+        roles: ["Embedded Systems Engineer", "Hardware Designer (PCB)", "IoT Solutions Architect", "Full Stack Developer", "Edge AI Specialist"]
+    },
+    {
+        id: "salon",
+        title: "GlowStream (Salon & Spa Intelligence)",
+        slug: "salon",
+        forWho: "Beauticians. Salon Managers. Makeup Artists. Front-desk staff.",
+        work: "Structuring service menus. Defining appointment flows. Writing skin/hair care suggestions. Managing beautician schedules.",
+        learn: "Scheduling tools, Google Calendar logic, Client Management (CRM) concepts.",
+        output: "Booking workflows, Service catalogs, Personalized beauty care plans.",
+        reason: "The beauty industry runs on appointments and trust. You help build the system that manages time and personalization.",
+        icon: "Sparkles",
+        image: "https://images.unsplash.com/photo-1560750588-73207b1ef5b8?auto=format&fit=crop&w=800&q=80",
+        gradient: "linear-gradient(135deg, #db2777 0%, #9d174d 100%)",
+        roles: ["Beautician / Stylist (SME)", "Salon Operations Manager", "Wellness Consultant", "Full Stack Developer", "AI Engineer (Recommendations)"]
+    }
+];
+
+export const TIMELINE_EXPLANATION = [
+    { month: "March", title: "Problem Selection", desc: "Choose ONE real-world problem. This defines your entire journey. No going back." },
+    { month: "April", title: "Assignment Phase", desc: "Learn the specific tools for your domain and submit proof-of-work (Write-up + Video)." },
+    { month: "May", title: "Evaluation", desc: "Our jury reviews your work blindly. No scores are shown to reduce pressure. Only the outcome matters." },
+    { month: "June", title: "Results & Certificates", desc: "Successful candidates get internship offers. All valid submissions get participation certificates." }
+];

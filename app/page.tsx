@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { CheckCircle2, ArrowRight, Share2, Linkedin, Facebook, Twitter, Smartphone, Code, Cpu, Database, Layout, X, Zap, HeartPulse, ShoppingBag, Server, Sparkles, Instagram, Target, Shield, TrendingUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { CAREER_DOMAINS, ELIGIBILITY_CRITERIA, TIMELINE_EXPLANATION } from '@/lib/content_data'
 
 // --- CORE PLATFORMS DATA (From DPR) ---
 const CORE_PLATFORMS = [
@@ -357,35 +358,66 @@ export default function Home() {
             </section>
 
             {/* 2. ECOSYSTEM & TRACKS (MOVED UP) */}
+            {/* 2. ECOSYSTEM & TRACKS (DYNAMIC) */}
             <section id="tracks" style={{ padding: 'var(--spacing-lg) 0', background: 'var(--secondary-bg)', position: 'relative', zIndex: 1 }}>
                 <div className="container">
                     <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-                        <h2 style={{ fontSize: '2.5rem', marginBottom: '16px' }}>Hackathon <span style={{ color: 'var(--brand-primary)' }}>Tracks</span></h2>
+                        <h2 style={{ fontSize: '2.5rem', marginBottom: '16px' }}>Our <span style={{ color: 'var(--brand-primary)' }}>Core Ecosystem</span></h2>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '700px', margin: '0 auto' }}>
                             Your background does not limit your selection. Choose your area of capability.
                         </p>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-                        {[
-                            { id: 'ai-ml', title: 'AI & Intelligence', details: 'OCR, NLP, RAG Systems, Model Tuning', tags: ['Python', 'LLMs'] },
-                            { id: 'fullstack', title: 'Full-Stack Eng', details: 'Next.js 14, Real-time Sync, Scalable Arch', tags: ['React', 'Node'] },
-                            { id: 'iot', title: 'IoT & Smart Systems', details: 'Sensor Fusion, Embedded, Edge Computing', tags: ['C++', 'IoT'] },
-                            { id: 'cloud', title: 'Cloud Platforms', details: 'Serverless, DevOps, Security, Infrastructure', tags: ['AWS', 'Supabase'] },
-                            { id: 'fashion-tech', title: 'Fashion & Beauty Tech', details: 'Virtual Try-On, AI Skin Analysis, Personal Styling', tags: ['GenAI', 'Vision'] },
-                            { id: 'marketing', title: 'Product, Growth & Ops', details: 'Strategy, Sales, Digital Marketing, Operations', tags: ['MBA', 'BBA', 'Arts', 'General'] },
-                        ].map((track, i) => (
-                            <Link key={i} href={`/projects/${track.id}`} className="glass-card link-card" style={{ borderLeft: `4px solid var(--brand-primary)`, display: 'block', textDecoration: 'none', transition: 'transform 0.2s', cursor: 'pointer' }}>
-                                <h4 style={{ marginBottom: '10px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>{track.title} <ArrowRight size={16} style={{ float: 'right', opacity: 0.5 }} /></h4>
-                                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>{track.details}</p>
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                    {track.tags.map(tag => (
-                                        <span key={tag} style={{ fontSize: '0.75rem', background: 'var(--tertiary-bg)', padding: '4px 10px', borderRadius: '4px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                                            {tag}
-                                        </span>
-                                    ))}
+                        {CAREER_DOMAINS.map((domain) => (
+                            <Link key={domain.id} href={`/domains/${domain.slug}`} className="glass-card" style={{ padding: '0', overflow: 'hidden', display: 'block', textDecoration: 'none', transition: 'transform 0.2s', cursor: 'pointer', border: '1px solid var(--glass-border)' }}>
+                                <div style={{ height: '140px', position: 'relative', background: domain.gradient }}>
+                                    <Image src={domain.image} alt={domain.title} fill style={{ objectFit: 'cover' }} />
+                                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)', color: 'white', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '5px', fontSize: '0.8rem', fontWeight: 600 }}>
+                                        View Track <ArrowRight size={14} />
+                                    </div>
+                                </div>
+
+                                <div style={{ padding: '20px' }}>
+                                    <h4 style={{ marginBottom: '8px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>{domain.title}</h4>
+                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.5, minHeight: '40px' }}>{domain.reason.slice(0, 90)}...</p>
+
+                                    <div style={{ marginBottom: '12px' }}>
+                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: '4px' }}>For:</span>
+                                        <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 500 }}>{domain.forWho.split('.')[0]}</p>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                        {domain.learn.split(',').slice(0, 3).map(tool => (
+                                            <span key={tool} style={{ fontSize: '0.75rem', background: 'var(--tertiary-bg)', padding: '4px 8px', borderRadius: '4px', color: 'var(--text-secondary)' }}>
+                                                {tool.trim()}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
                             </Link>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* 2a. ELIGIBILITY SECTION (NEW) */}
+            <section style={{ padding: 'var(--spacing-lg) 0', background: 'white', position: 'relative', zIndex: 1 }}>
+                <div className="container">
+                    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                        <h2 style={{ fontSize: '2.5rem', marginBottom: '16px' }}>Who Can <span style={{ color: 'var(--brand-primary)' }}>Join?</span></h2>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', maxWidth: '1000px', margin: '0 auto' }}>
+                        {ELIGIBILITY_CRITERIA.map((crit, idx) => (
+                            <div key={idx} className="glass-card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', border: crit.isWarning ? '1px solid #fee2e2' : '1px solid var(--glass-border)' }}>
+                                <div style={{ background: crit.isWarning ? '#fee2e2' : '#e0e7ff', padding: '10px', borderRadius: '50%', color: crit.isWarning ? '#ef4444' : 'var(--brand-primary)' }}>
+                                    {crit.isWarning ? <CheckCircle2 size={20} style={{ transform: 'rotate(45deg)' }} /> : <CheckCircle2 size={20} />}
+                                </div>
+                                <div>
+                                    <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{crit.label}</span>
+                                    <span style={{ fontSize: '1rem', fontWeight: 700, color: crit.isWarning ? '#ef4444' : 'var(--text-primary)' }}>{crit.value}</span>
+                                </div>
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -405,10 +437,9 @@ export default function Home() {
                         <div className="glass-card" style={{ padding: '30px', borderLeft: '4px solid var(--accent-gold)' }}>
                             <h4 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>Timeline & Evaluation</h4>
                             <ul style={{ listStyle: 'none', padding: 0, color: 'var(--text-secondary)', lineHeight: '1.7' }}>
-                                <li style={{ marginBottom: '10px' }}>• <strong>Mar:</strong> Enrolments Close. No exceptions.</li>
-                                <li style={{ marginBottom: '10px' }}>• <strong>Apr:</strong> Problem Statement Submissions.</li>
-                                <li style={{ marginBottom: '10px' }}>• <strong>May:</strong> Internal Evaluation & Code Review.</li>
-                                <li style={{ marginBottom: '10px' }}>• <strong>Jun:</strong> Results & Internship Offers.</li>
+                                {TIMELINE_EXPLANATION.map((item, idx) => (
+                                    <li key={idx} style={{ marginBottom: '10px' }}>• <strong>{item.month}:</strong> {item.title}.</li>
+                                ))}
                             </ul>
                             <Link href="/terms#timeline" style={{ fontSize: '0.85rem', color: 'var(--brand-primary)', textDecoration: 'underline', marginTop: '10px', display: 'inline-block' }}>
                                 View detailed timeline
@@ -532,68 +563,6 @@ export default function Home() {
                                 ))}
                             </div>
                         </div>
-
-                    </div>
-                </div>
-            </section>
-
-            {/* 5. OUR CORE PLATFORMS (Moved down) */}
-            <section style={{ padding: 'var(--spacing-lg) 0', background: 'white', position: 'relative', zIndex: 1 }}>
-                <div className="container">
-                    <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-                        <h2 style={{ fontSize: '2.5rem', marginBottom: '16px' }}>Our <span style={{ color: 'var(--brand-primary)' }}>Core Platforms</span></h2>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>
-                            We don't just host hackathons. We build vertically integrated AI solutions for the real world.
-                        </p>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '30px' }}>
-                        {CORE_PLATFORMS.map((platform) => (
-                            <div
-                                key={platform.id}
-                                className="glass-card"
-                                style={{
-                                    padding: '0',
-                                    overflow: 'hidden',
-                                    cursor: 'pointer',
-                                    transition: 'transform 0.2s, box-shadow 0.2s',
-                                    border: '1px solid var(--glass-border)'
-                                }}
-                                onClick={() => setSelectedPlatform(platform)}
-                            >
-                                <div style={{
-                                    height: '180px',
-                                    position: 'relative',
-                                    background: 'var(--tertiary-bg)' // Fallback
-                                }}>
-                                    <Image
-                                        src={platform.image}
-                                        alt={platform.title}
-                                        fill
-                                        style={{ objectFit: 'cover' }}
-                                    />
-                                    <div style={{
-                                        position: 'absolute',
-                                        bottom: 0, left: 0, right: 0,
-                                        padding: '10px',
-                                        background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)',
-                                        color: 'white',
-                                        display: 'flex',
-                                        justifyContent: 'flex-end'
-                                    }}>
-                                        {platform.icon}
-                                    </div>
-                                </div>
-
-                                <div style={{ padding: '24px' }}>
-                                    <h3 style={{ fontSize: '1.25rem', marginBottom: '8px' }}>{platform.title}</h3>
-                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.5 }}>{platform.tagline}</p>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--brand-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        View Vision <ArrowRight size={14} />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
                     </div>
                 </div>
             </section>

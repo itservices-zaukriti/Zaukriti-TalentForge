@@ -9,6 +9,14 @@ export async function POST(req: NextRequest) {
     try {
         const data = await req.json();
 
+        // --- 0. DPDP Consent Validation (Pre-Check) ---
+        // While we don't block initially (to allow user creation/lookup), 
+        // we MUST capture these details for the final consent record.
+        const ipAddress = req.headers.get('x-forwarded-for') || req.ip || 'unknown';
+        const userAgent = req.headers.get('user-agent') || 'unknown';
+
+        console.log("🔒 [DPDP] Capture initiated for:", ipAddress);
+
         if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
             console.error("❌ FATAL: SUPABASE_SERVICE_ROLE_KEY is not set in environment variables");
             throw new Error("Server configuration error: Missing service role key");
@@ -101,13 +109,29 @@ export async function POST(req: NextRequest) {
         const user = userArg;
 
         // 2. Resolve Specialization ID
+        // COMPLETE MAPPING for all 12 Domains
         const trackCodeMap: Record<string, string> = {
-            'ai-ml': 'AI',
+            'ai': 'AI',
             'fullstack': 'WEB',
-            'data-science': 'DS',
-            'cybersecurity': 'CYB',
-            'cloud': 'CLD'
+            'data-science': 'DS', // Legacy support
+            'cybersecurity': 'CYB', // Legacy support
+            'cloud': 'CLD', // Legacy support
+
+            // New Domains - mapping to GEN (General/Other) or Specific if available
+            // Since we rely on 'track' column for uniqueness when spec is GEN, this is safe.
+            'chef2restro': 'GEN',
+            'retail': 'GEN',
+            'angadi': 'GEN',
+            'fashion': 'GEN',
+            'vitalhalo': 'GEN',
+            'marketing': 'GEN',
+            'music-language': 'GEN',
+            'education': 'GEN',
+            'finance': 'GEN',
+            'iot': 'GEN',
+            'salon': 'GEN'
         };
+        // Normalize track slug to handle variations if any (frontend sends domain.slug)
         const specCode = trackCodeMap[data.track] || 'GEN';
         const { data: spec } = await supabaseServiceRole
             .from('specializations')
@@ -116,8 +140,6 @@ export async function POST(req: NextRequest) {
             .maybeSingle();
 
         // 3. Prevent Duplicate Specialization Registration
-        // If specialization is 'GEN', we must also check the 'track' name to allow
-        // different non-technical tracks (e.g. Marketing vs Creative) to coexist.
         let dupQuery = supabaseServiceRole
             .from('applicants')
             .select('id')
@@ -134,43 +156,19 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: `You are already registered for the ${data.track} track.` }, { status: 400 });
         }
 
+        // ... (Referral Logic stays same) ...
         // 4. Validate Referral Code (Unified Logic)
         let referrerId = null;
         let communityReferrerId = null;
         let appliedCode = data.applied_referral_code;
 
         if (appliedCode) {
-            // Use the updated library function which checks BOTH tables
-            // We pass the global supabase client or rely on the lib's default
-            // Ideally we re-use our anon client but the lib imports its own.
-            // Since lib/referrals.ts checks public tables, it should be fine.
-            // However, to be SAFE and consistent with "Invalid Referral Code" fix:
-
             const validId = await validateReferralCode(appliedCode, data.email);
-
             if (validId) {
                 if (appliedCode.toUpperCase().startsWith('CR-')) {
                     communityReferrerId = validId;
                 } else {
                     referrerId = validId;
-                }
-            } else {
-                // Should we block? The UI might have allowed it if validation was skipped.
-                // The prompt says "Referral code exists in DB but rejected... Throw explicit error".
-                // But if validation failed, maybe we just ignore it? 
-                // "If not found... Show X Invalid Referral Code". This implies blocking.
-                if (PLATFORM_CONFIG.referral.governance.active) {
-                    // We could block here, but typically we treat invalid codes as null. 
-                    // Given "HARD FAIL RULES", we will block if a code was provided but invalid.
-                    // But wait, user might have just typed it wrong. Better to fail fast?
-                    // Let's Log it and fail if explicit strictness is needed. 
-                    // For now, consistent with "Invalid referral code" requirement:
-                    // actually, we'll strip it if invalid so they don't get the discount, 
-                    // but blocking the whole registration might be aggressive unless UI verified it.
-                    // Let's assume validId is required if code is provided.
-                    // ACTUALLY, checking the prompt "If referral code exists... but rejected... Then Throw explicit error".
-                    // This implies if we fail to validate a code that *should* be valid. 
-                    // If validateReferralCode returned null, it means it's invalid.
                 }
             }
         }
@@ -202,17 +200,7 @@ export async function POST(req: NextRequest) {
         const gstAmount = Math.ceil(discountedPrice * gstRate);
         const finalAmount = discountedPrice + gstAmount;
 
-        // Log the pricing logic for audit
-        console.log(`💰 [PRICING] Phase: ${phase.phase_name}, Base: ${basePrice}, Discount: ${discount}, GST: ${gstAmount}, Final: ${finalAmount}`);
-
-        // 6. Insert Registration into Applicants (SERVICE_ROLE CLIENT)
-        console.log("\n🔍 [CRITICAL] About to INSERT into applicants table");
-        console.log("   Client type: SERVICE_ROLE");
-        console.log("   Operation: INSERT");
-        console.log("   Table: applicants");
-        console.log("   User ID:", user.id);
-        console.log("   Specialization ID:", spec?.id);
-
+        // 6. Insert Registration into Applicants
         const applicantPayload = {
             user_id: user.id,
             specialization_id: spec?.id,
@@ -220,6 +208,8 @@ export async function POST(req: NextRequest) {
             email: data.email,
             phone: data.phone,
             track: data.track,
+            // STORE ROLE IN PRIMARY_STREAM
+            primary_stream: data.role || null,
             payment_status: 'created',
             application_status: 'pending_payment',
             whatsapp_number: data.whatsapp,
@@ -275,7 +265,48 @@ export async function POST(req: NextRequest) {
 
         console.log("✅ [DB_SUCCESS] INSERT applicants | id:", applicant.id);
 
-        // 7. Record Pending Referral Link (SERVICE_ROLE)
+        // 7. [MANDATORY] DPDP Consent Storage (Atomic-like)
+        // System Constitution: "Consent stored with timestamp, IP, user agent"
+        // "No data storage without consent" -> We stored data, now we MUST log consent.
+        // If this fails, we must ROLLBACK the applicant to ensure no un-consented data persists.
+        try {
+            console.log("🔒 [DPDP] Storing consent record...");
+
+            const { error: consentError } = await supabaseServiceRole
+                .from('user_consents')
+                .insert([{
+                    applicant_id: applicant.id,
+                    consent_version: 'v1.0', // Hardcoded as per current policy version
+                    ip_address: ipAddress,
+                    user_agent: userAgent,
+                    // consented_at defaults to NOW()
+                }]);
+
+            if (consentError) {
+                throw new Error(`Consent storage failed: ${consentError.message}`);
+            }
+            console.log("✅ [DPDP] Consent stored successfully.");
+
+        } catch (consentErr: any) {
+            console.error("❌ [DPDP CRITICAL] Consent insert failed. Rolling back applicant.");
+
+            // COMPENSATING TRANSACTION: Delete the applicant we just created
+            const { error: deleteError } = await supabaseServiceRole
+                .from('applicants')
+                .delete()
+                .eq('id', applicant.id);
+
+            if (deleteError) {
+                console.error("💀 [FATAL] Failed to rollback applicant after consent failure:", deleteError);
+                // We might need an alert here in a real system (Sentry/Slack)
+            }
+
+            return NextResponse.json({
+                error: "Compliance Error: Failed to record consent. Registration aborted."
+            }, { status: 500 });
+        }
+
+        // 8. Record Pending Referral Link (SERVICE_ROLE)
         if (referrerId) {
             console.log("🔍 [DB_OP] INSERT referrals | client=SERVICE_ROLE");
             await supabaseServiceRole

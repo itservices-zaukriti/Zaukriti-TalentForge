@@ -1,8 +1,75 @@
 import { Resend } from 'resend';
+import { NOTIFICATION_TEMPLATES } from './communication_templates';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export async function sendConfirmationEmail(email: string, name: string, track: string, referralCode: string) {
+// --- Transport Layer (Stubs for SMS/WhatsApp) ---
+async function sendWhatsAppMessage(phone: string, message: string) {
+    console.log(`📱 [WHATSAPP] To: ${phone} | Body: ${message}`);
+    // Integration point for Twilio / Interakt / WATI
+    return true;
+}
+
+async function sendSMS(phone: string, message: string) {
+    console.log(`💬 [SMS] To: ${phone} | Body: ${message}`);
+    // Integration point for Twilio / Msg91 / Kaleyra
+    return true;
+}
+
+// --- Event Triggers ---
+export async function sendProblemSelectionOpenNotification(email: string, phone: string, name: string) {
+    const template = NOTIFICATION_TEMPLATES.PROBLEM_SELECTION_OPEN;
+
+    // 1. Email
+    try {
+        await resend.emails.send({
+            from: 'Zaukriti TalentForge <talentforge@zaukriti.ai>',
+            to: email,
+            subject: template.subject,
+            html: `<pre style="font-family: sans-serif; font-size: 14px;">${template.emailBody(name)}</pre>` // Basic HTML wrapper for text body
+        });
+        console.log(`📧 [NOTIFY] Problem Selection Email sent to ${email}`);
+    } catch (e) { console.error("Email failed", e); }
+
+    // 2. WhatsApp
+    try {
+        await sendWhatsAppMessage(phone, template.whatsappBody(name));
+    } catch (e) { console.error("WhatsApp failed", e); }
+}
+
+export async function sendAssignmentOpenNotification(email: string, phone: string, name: string) {
+    const template = NOTIFICATION_TEMPLATES.ASSIGNMENT_OPEN;
+
+    try {
+        await resend.emails.send({
+            from: 'Zaukriti TalentForge <talentforge@zaukriti.ai>',
+            to: email,
+            subject: template.subject,
+            html: `<pre style="font-family: sans-serif; font-size: 14px;">${template.emailBody(name)}</pre>`
+        });
+        console.log(`📧 [NOTIFY] Assignment Open Email sent to ${email}`);
+
+        await sendWhatsAppMessage(phone, template.whatsappBody);
+    } catch (e) { console.error("Notification failed", e); }
+}
+
+export async function sendResultsDeclaredNotification(email: string, phone: string, name: string) {
+    const template = NOTIFICATION_TEMPLATES.RESULTS_DECLARED;
+
+    try {
+        await resend.emails.send({
+            from: 'Zaukriti TalentForge <talentforge@zaukriti.ai>',
+            to: email,
+            subject: template.subject,
+            html: `<pre style="font-family: sans-serif; font-size: 14px;">${template.emailBody(name)}</pre>`
+        });
+        console.log(`📧 [NOTIFY] Results Declared Email sent to ${email}`);
+
+        await sendWhatsAppMessage(phone, template.whatsappBody);
+    } catch (e) { console.error("Notification failed", e); }
+}
+
+export async function sendConfirmationEmail(email: string, name: string, track: string, referralCode: string, phone?: string) {
     try {
         const shareUrl = encodeURIComponent(`https://zaukriti.ai/apply?ref=${referralCode}`);
         const shareText = encodeURIComponent(`Just joined Zaukriti TalentForge to build in ${track}! Use my code ${referralCode} to join and we both get rewarded. 🚀 #Zaukriti #TalentForge`);
@@ -39,6 +106,16 @@ export async function sendConfirmationEmail(email: string, name: string, track: 
             `
         });
         console.log('Resend Delivery Log (Confirmation):', response);
+
+        // --- Multi-channel Notification ---
+        // --- Multi-channel Notification ---
+        if (phone) {
+            const waBody = NOTIFICATION_TEMPLATES.REGISTRATION_COMPLETE.whatsappBody(name, referralCode);
+            const smsBody = NOTIFICATION_TEMPLATES.REGISTRATION_COMPLETE.smsBody(referralCode);
+            await sendWhatsAppMessage(phone, waBody);
+            await sendSMS(phone, smsBody);
+        }
+
     } catch (error) {
         console.error('Email Notification Error:', error);
     }
@@ -163,4 +240,43 @@ export async function sendCommunityWelcomeEmail(email: string, name: string, org
     } catch (error) {
         console.error('Community Email Error:', error);
     }
+}
+
+export async function sendPaymentPendingNotification(email: string, phone: string, name: string, resumeLink: string) {
+    const template = NOTIFICATION_TEMPLATES.PAYMENT_PENDING;
+    let emailSuccess = false;
+    let msgSuccess = false;
+
+    // 1. Email
+    try {
+        const response: any = await resend.emails.send({
+            from: 'Zaukriti TalentForge <talentforge@zaukritievents.in>',
+            to: email,
+            subject: template.subject,
+            html: `<pre style="font-family: sans-serif; font-size: 14px; white-space: pre-wrap;">${template.emailBody(name, resumeLink)}</pre>`
+        });
+        console.log('Resend Delivery Log (Payment Pending):', response);
+        if (response.id) emailSuccess = true;
+        // Resend success response usually has an 'id'. Error response has 'error'.
+        if (response.error) {
+            console.error("Resend returned error:", response.error);
+            emailSuccess = false;
+        }
+    } catch (e) {
+        console.error("Email failed", e);
+        emailSuccess = false;
+    }
+
+    // 2. WhatsApp & SMS
+    if (phone) {
+        try {
+            await sendWhatsAppMessage(phone, template.whatsappBody(name, resumeLink));
+            await sendSMS(phone, template.smsBody(resumeLink));
+            msgSuccess = true;
+        } catch (e) {
+            console.error("Messaging failed", e);
+        }
+    }
+
+    return { email: emailSuccess, message: msgSuccess };
 }
