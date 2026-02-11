@@ -21,24 +21,41 @@ export async function POST(req: NextRequest) {
         );
 
         // 1. Find or Create User
+        // Normalize Phone (Strict 10 digit) - Consistent with main register route
+        const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+
+        // 1. Find or Create User (Upsert for Idempotency)
+        // We use UPSERT on 'phone' to prevent "users_phone_key" violations.
+        // If email conflicts with a DIFFERENT record, this might still error, but assuming phone is primary unique ID here.
         let user_id;
-        const { data: existingUser } = await supabase
+
+        const { data: user, error: userError } = await supabase
             .from('users')
-            .select('id')
-            .or(`email.eq.${email},phone.eq.${phone}`)
-            .maybeSingle();
+            .upsert({
+                full_name: name,
+                email: email,
+                phone: cleanPhone
+            }, { onConflict: 'phone' })
+            .select()
+            .single();
 
-        if (existingUser) {
-            user_id = existingUser.id;
-        } else {
-            const { data: newUser, error: createError } = await supabase
+        if (userError) {
+            // Fallback: If upsert failed (e.g. email conflict), try fetching by email
+            console.warn("⚠️ [UPSERT_FAIL] Conflict on phone upsert (likely email mismatch). Fetching existing...", userError.message);
+            const { data: fallbackUser } = await supabase
                 .from('users')
-                .insert([{ full_name: name, email, phone }])
                 .select('id')
-                .single();
+                .eq('email', email)
+                .maybeSingle();
 
-            if (createError) throw createError;
-            user_id = newUser.id;
+            if (fallbackUser) {
+                user_id = fallbackUser.id;
+            } else {
+                // Real Error
+                throw userError;
+            }
+        } else {
+            user_id = user.id;
         }
 
         // 2. Find or Create Applicant Record

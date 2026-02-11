@@ -140,20 +140,67 @@ export async function POST(req: NextRequest) {
             .maybeSingle();
 
         // 3. Prevent Duplicate Specialization Registration
-        let dupQuery = supabaseServiceRole
-            .from('applicants')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('specialization_id', spec?.id);
+        // 3. Idempotency & Duplicate Check
+        // We check if this user has ALREADY applied for this Track (or any track? usually one per phase?)
+        // The requirement is "One row per logical application".
+        // Strategy:
+        // - Check for existing application by this user for this Phase + Track (or Phase if 1 per phase allowed).
+        // Let's stick to Track-based uniqueness for now to allow multiple track applications if business logic permits (though usually 1).
+        // BUT user says "Same user_id, same cohort... A NEW ROW is inserted".
+        // Better to check (user_id, pricing_phase).
 
-        if (specCode === 'GEN') {
-            dupQuery = dupQuery.eq('track', data.track);
+        console.log("🔍 [IDEMPOTENCY] Checking for existing application...");
+
+        // FETCH PRICING PHASE FIRST (Needed for Idempotency Check)
+        const pricingData = await getCurrentPricingFromDB(supabaseServiceRole);
+        if (!pricingData) {
+            console.error("❌ [PRICING] No active pricing phase found in DB");
+            return NextResponse.json({ error: "Registration is not currently active." }, { status: 400 });
         }
+        const { phase, amounts } = pricingData;
 
-        const { data: existingReg } = await dupQuery.maybeSingle();
+        // Check for existing applications in this Phase
+        // FIX: Fetch ALL for this user + phase to implement multi-track logic
+        const { data: existingRegs } = await supabaseServiceRole
+            .from('applicants')
+            .select('id, payment_status, track, application_status')
+            .eq('user_id', user.id)
+            .eq('pricing_phase', phase.phase_name)
+            .order('created_at', { ascending: false });
 
-        if (existingReg) {
-            return NextResponse.json({ error: `You are already registered for the ${data.track} track.` }, { status: 400 });
+        let applicantIdToReturn = null;
+        let isUpdate = false;
+        let existingReg = null;
+
+        // Logic Grid:
+        // 1. Same Track + Paid -> Return Success (Idempotent)
+        // 2. Different Track + Paid -> Allow New Registration (Insert)
+        // 3. Any Track + Pending -> Update Existing Pending (Reuse drafting slot)
+
+        const paidSameTrack = existingRegs?.find(r => r.payment_status === 'Paid' && r.track === data.track);
+        const pendingAny = existingRegs?.find(r => r.payment_status !== 'Paid');
+
+        if (paidSameTrack) {
+            // Case 1: Already Paid for this specific track.
+            // Return success immediately to show "You are registered".
+            console.log(`✅ [IDEMPOTENCY] Found PAID application for ${data.track}. Returning existing.`);
+            existingReg = paidSameTrack;
+            applicantIdToReturn = paidSameTrack.id;
+            isUpdate = true; // Technically update path, but we won't change data much if Paid
+        } else if (pendingAny) {
+            // Case 3: Found a pending application (Draft).
+            // Even if track is different, we UPDATE this draft.
+            // "started payment for X, failed, went back, changed to Y" -> Update X to Y.
+            console.log(`⚠️ [DRAFT_REUSE] Found pending application ${pendingAny.id} (Track: ${pendingAny.track}). Updating to ${data.track}...`);
+            existingReg = pendingAny;
+            applicantIdToReturn = pendingAny.id;
+            isUpdate = true;
+        } else {
+            // Case 2 or New: No pending drafts, and no paid app for THIS track.
+            // Proceed to Insert New.
+            console.log(`🆕 [NEW_APP] No conflicting app found. Creating new registration for ${data.track}.`);
+            existingReg = null;
+            isUpdate = false;
         }
 
         // ... (Referral Logic stays same) ...
@@ -174,14 +221,9 @@ export async function POST(req: NextRequest) {
         }
 
         // 5. Server-Side Fee Validation (DB-DRIVEN)
-        const pricingData = await getCurrentPricingFromDB(supabaseServiceRole);
-        if (!pricingData) {
-            console.error("❌ [PRICING] No active pricing phase found in DB");
-            return NextResponse.json({ error: "Registration is not currently active." }, { status: 400 });
-        }
+        // Pricing Data already fetched above
 
         const pricingConfig = await getPricingConfig(supabaseServiceRole);
-        const { phase, amounts } = pricingData;
 
         const targetTeamSize = parseInt(data.teamSize || '1');
         const basePrice = amounts[targetTeamSize.toString()] ?? 0;
@@ -201,6 +243,7 @@ export async function POST(req: NextRequest) {
         const finalAmount = discountedPrice + gstAmount;
 
         // 6. Insert Registration into Applicants
+        // 6. Insert OR Update Registration
         const applicantPayload = {
             user_id: user.id,
             specialization_id: spec?.id,
@@ -210,8 +253,11 @@ export async function POST(req: NextRequest) {
             track: data.track,
             // STORE ROLE IN PRIMARY_STREAM
             primary_stream: data.role || null,
-            payment_status: 'created',
-            application_status: 'pending_payment',
+            // Don't reset payment status if we are updating? Or enforce 'pending_payment'?
+            // If we are updating a Draft, keep it 'created' or 'pending_payment'.
+            // If updating a PAID application, PRESERVE the status!
+            payment_status: (isUpdate && existingReg?.payment_status === 'Paid') ? 'Paid' : 'created',
+            application_status: (isUpdate && existingReg?.payment_status === 'Paid') ? (existingReg.application_status || 'Applied') : 'pending_payment',
             whatsapp_number: data.whatsapp,
             city_state: data.city_state,
             college_name: data.college,
@@ -236,34 +282,42 @@ export async function POST(req: NextRequest) {
             family_income_range: data.familyData?.income_range || data.family_income_range || null
         };
 
-        console.log("🔍 [DB_OP] INSERT applicants | client=SERVICE_ROLE");
-        console.log("   Table: applicants");
-        console.log("   Payload keys:", Object.keys(applicantPayload));
-        console.log("   Payload values (sanitized):", {
-            user_id: applicantPayload.user_id,
-            specialization_id: applicantPayload.specialization_id,
-            email: applicantPayload.email,
-            payment_status: applicantPayload.payment_status,
-            team_size: applicantPayload.team_size
-        });
+        let applicant;
 
-        const { data: applicant, error: applicantError } = await supabaseServiceRole
-            .from('applicants')
-            .insert([applicantPayload])
-            .select()
-            .single();
+        if (isUpdate && applicantIdToReturn) {
+            console.log("🔍 [DB_OP] UPDATE applicants | client=SERVICE_ROLE | id:", applicantIdToReturn);
+            const { data: updatedApp, error: updateError } = await supabaseServiceRole
+                .from('applicants')
+                .update(applicantPayload)
+                .eq('id', applicantIdToReturn)
+                .select()
+                .single();
 
-        if (applicantError) {
-            console.error('\n❌ [DB_ERROR] INSERT applicants FAILED');
-            console.error('   Error code:', applicantError.code);
-            console.error('   Error message:', applicantError.message);
-            console.error('   Error details:', applicantError.details);
-            console.error('   Error hint:', applicantError.hint);
-            console.error('   Full error object:', JSON.stringify(applicantError, null, 2));
-            throw applicantError;
+            if (updateError) {
+                console.error("❌ [DB_ERROR] UPDATE applicants FAILED:", updateError);
+                throw updateError;
+            }
+            applicant = updatedApp;
+            console.log("✅ [DB_SUCCESS] UPDATE applicants | id:", applicant.id);
+
+        } else {
+            console.log("🔍 [DB_OP] INSERT applicants | client=SERVICE_ROLE");
+            console.log("   Table: applicants");
+            console.log("   Payload keys:", Object.keys(applicantPayload));
+
+            const { data: newApp, error: applicantError } = await supabaseServiceRole
+                .from('applicants')
+                .insert([applicantPayload])
+                .select()
+                .single();
+
+            if (applicantError) {
+                console.error('\n❌ [DB_ERROR] INSERT applicants FAILED');
+                throw applicantError; // simplified logging mainly
+            }
+            applicant = newApp;
+            console.log("✅ [DB_SUCCESS] INSERT applicants | id:", applicant.id);
         }
-
-        console.log("✅ [DB_SUCCESS] INSERT applicants | id:", applicant.id);
 
         // 7. [MANDATORY] DPDP Consent Storage (Atomic-like)
         // System Constitution: "Consent stored with timestamp, IP, user agent"
@@ -291,14 +345,20 @@ export async function POST(req: NextRequest) {
             console.error("❌ [DPDP CRITICAL] Consent insert failed. Rolling back applicant.");
 
             // COMPENSATING TRANSACTION: Delete the applicant we just created
-            const { error: deleteError } = await supabaseServiceRole
-                .from('applicants')
-                .delete()
-                .eq('id', applicant.id);
+            // ONLY IF IT WAS A NEW INSERT. If Update, we shouldn't delete existing data? 
+            // Compromise: We keep consistent behavior. If consent fails, we block app. 
+            // But deleting a resumed app is bad.
+            if (!isUpdate) {
+                const { error: deleteError } = await supabaseServiceRole
+                    .from('applicants')
+                    .delete()
+                    .eq('id', applicant.id);
 
-            if (deleteError) {
-                console.error("💀 [FATAL] Failed to rollback applicant after consent failure:", deleteError);
-                // We might need an alert here in a real system (Sentry/Slack)
+                if (deleteError) {
+                    console.error("💀 [FATAL] Failed to rollback applicant after consent failure:", deleteError);
+                }
+            } else {
+                console.error("⚠️ [DPDP] Audit log failure on Update. Not rolling back existing applicant.");
             }
 
             return NextResponse.json({
@@ -329,7 +389,7 @@ export async function POST(req: NextRequest) {
                 }]);
         }
 
-        return NextResponse.json({ id: applicant.id });
+        return NextResponse.json({ id: applicant.id, payment_status: applicant.payment_status });
     } catch (error: any) {
         console.error('Registration Error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });

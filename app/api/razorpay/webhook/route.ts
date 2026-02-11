@@ -44,7 +44,8 @@ export async function POST(req: NextRequest) {
             applicantQuery = applicantQuery.eq('id', applicantId);
         } else {
             // Fallback to order_id if notes missing (legacy flow)
-            applicantQuery = applicantQuery.eq('payment_order_id', orderId);
+            // Use correct column (razorpay_order_id or payment_reference)
+            applicantQuery = applicantQuery.or(`razorpay_order_id.eq.${orderId},payment_reference.eq.${orderId}`);
         }
 
         const { data: applicant, error: findError } = await applicantQuery.single();

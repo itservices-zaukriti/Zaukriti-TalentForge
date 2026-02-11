@@ -400,20 +400,24 @@ export default function ApplyClient() {
     setIsSubmitting(true)
     setPaymentStatus('pending')
 
-    const payload = {
-      ...formData,
-      // Family Data collected is null since step was removed
-      familyData: {
-        guardian_profession: null,
-        income_range: null
-      },
-      // Pass Role as primary_stream (mapped in backend or passed directly)
-      // Actually let's pass it as a custom field "role" and let backend handle it
-      role: formData.role === 'other' ? formData.customRole : formData.role
-    }
+    // Use existing applicant ID if already registered in this session
+    let applicantId = regId;
 
     try {
-      // 1. Create Applicant
+      // Always update registration details first (Upsert Logic)
+      const payload = {
+        ...formData,
+        // Family Data collected is null since step was removed
+        familyData: {
+          guardian_profession: null,
+          income_range: null
+        },
+        // Pass Role as primary_stream (mapped in backend or passed directly)
+        // Actually let's pass it as a custom field "role" and let backend handle it
+        role: formData.role === 'other' ? formData.customRole : formData.role
+      }
+
+      // 1. Create OR Update Applicant
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -426,7 +430,18 @@ export default function ApplyClient() {
         throw new Error(data.error || 'Registration failed')
       }
 
-      const applicantId = data.id
+      applicantId = data.id
+      setRegId(applicantId) // Save for retry/resume in same session
+
+      // CHECK: If already PAID (e.g. updating existing record), skip Payment
+      if (data.payment_status === 'Paid') {
+        console.log("✅ [CLIENT] Application updated and already PAID. Skipping gateway.");
+        setStep(5);
+        setIsSubmitting(false);
+        setPaymentStatus('success');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
 
       // 2. Create Razorpay Order
       const orderRes = await fetch('/api/razorpay/order', {
@@ -436,6 +451,7 @@ export default function ApplyClient() {
           teamSize: formData.teamSize,
           currency: 'INR',
           receipt: applicantId,
+          applicantId: applicantId, // REQUIRED for Resume/Idempotency Logic
           referralCode: formData.applied_referral_code,
           email: formData.email
         })
@@ -479,7 +495,6 @@ export default function ApplyClient() {
             if (!verifyRes.ok) throw new Error(verifyData.error || 'Verification failed')
 
             // 5. Success
-            setRegId(applicantId)
             setStep(5) // Success Step
             setIsSubmitting(false)
             setPaymentStatus('success')

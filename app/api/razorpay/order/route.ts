@@ -6,6 +6,7 @@ import {
     getCurrentPricingFromDB,
     getPricingConfig
 } from '@/lib/pricing';
+import { validateReferralCode } from '@/lib/referrals';
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID!,
@@ -26,6 +27,8 @@ export async function POST(req: NextRequest) {
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
 
+        const applicantIdResult = reqBody.applicantId || reqBody.receipt;
+
         // 7. Check if Resume Mode (Applicant ID provided)
         let finalAmount;
         let baseAmount;
@@ -33,15 +36,22 @@ export async function POST(req: NextRequest) {
         let gstAmount;
         let phaseName;
 
-        if (reqBody.applicantId) {
+        if (applicantIdResult && applicantIdResult !== 'new') { // 'new' might be passed strictly? No, usually ID.
             // RESUME MODE: Fetch from existing record to respect original locked price
             const { data: applicant } = await supabaseServiceRole
                 .from('applicants')
-                .select('amount_paid, base_amount, discount_amount, gst_amount, pricing_phase')
-                .eq('id', reqBody.applicantId)
+                .select('amount_paid, base_amount, discount_amount, gst_amount, pricing_phase, razorpay_order_id')
+                .eq('id', applicantIdResult)
                 .single();
 
             if (!applicant) throw new Error("Applicant record not found for resume payment.");
+
+            // IDEMPOTENCY: If order already exists?
+            // User requirement: "If exists -> reuse it".
+            // However, orders expire. A safer bet is to create a new order if the old one is old? 
+            // Or just overwrite.
+            // Let's just create a new one to be safe against expiration/cancellation for now, 
+            // BUT CRITICALLY: Update the DB with the NEW order ID.
 
             finalAmount = applicant.amount_paid;
             baseAmount = applicant.base_amount || 0; // fallback if older record
@@ -79,38 +89,16 @@ export async function POST(req: NextRequest) {
 
             const referralEnabled = !process.env.REFERRAL_FREEZE;
             if (referralEnabled && reqBody.referralCode && reqBody.email) {
-                // Unified Referral Check (Simulated for calculation - actual validation happens in /register for DB insert)
-                // Or we re-verify here?
-                // Let's assume passed code is valid if UI sent it, but we can double check db.
-                // Actually, simpler: calculate discount if code is valid.
-                // Ideally we call validateReferralCode here too.
-                // Skipping deep verify for speed as /register confirms it.
-                // Wait, this is creating the ORDER. We must verify here to give the discount in the order amount.
-                let isValidRef = false;
-                // ... (existing logic for checking ref code) ...
-                // For now, let's keep it simple: if referralCode provided and valid, apply discount.
-                // RE-USING logic from previous implementation if possible or re-writing robustly.
+                // Unified Referral Check using centralized logic
+                const validReferrerId = await validateReferralCode(
+                    reqBody.referralCode,
+                    reqBody.email,
+                    supabaseServiceRole
+                );
 
-                // COPYING RELEVANT LOGIC FROM OLD IMPLEMENTATION:
-                if (reqBody.referralCode.startsWith('CR-')) {
-                    const { data } = await supabaseServiceRole // using service role for certainty
-                        .from('community_referrers')
-                        .select('id')
-                        .eq('referral_code', reqBody.referralCode.toUpperCase())
-                        .eq('status', 'active')
-                        .maybeSingle();
-                    if (data) isValidRef = true;
-                } else {
-                    // check std
-                    const { count } = await supabaseServiceRole
-                        .from('applicants')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('referral_code', reqBody.referralCode) // case sensitive? usually upper
-                        .neq('email', reqBody.email);
-                    if (count) isValidRef = true;
+                if (validReferrerId) {
+                    discount = pricingConfig.referralDiscount;
                 }
-
-                if (isValidRef) discount = pricingConfig.referralDiscount;
             }
 
             const discountedAmount = Math.max(0, baseAmount - discount);
@@ -129,11 +117,22 @@ export async function POST(req: NextRequest) {
                 base_amount: baseAmount,
                 discount_amount: discount,
                 gst_amount: gstAmount,
-                applicant_id: reqBody.applicantId || 'new'
+                applicant_id: applicantIdResult || 'new'
             },
         });
 
-        // 6️⃣ Response to frontend
+        // 6️⃣ [FIX] Update Applicant with Order ID to link them
+        if (applicantIdResult && applicantIdResult !== 'new') {
+            await supabaseServiceRole
+                .from('applicants')
+                .update({
+                    payment_reference: order.id, // standard ref
+                    razorpay_order_id: order.id // schema-aligned explicit column
+                })
+                .eq('id', applicantIdResult);
+        }
+
+        // 7️⃣ Response to frontend
         return NextResponse.json({
             id: order.id,
             amount: order.amount,

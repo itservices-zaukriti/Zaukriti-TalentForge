@@ -73,13 +73,15 @@ export async function generateReferralCodeForApplicant(applicantId: string, supa
  * Validates a referral code and returns the referrer's applicant ID.
  * Blocks self-referrals based on email similarity.
  */
-export async function validateReferralCode(code: string, currentEmail: string): Promise<string | null> {
+export async function validateReferralCode(code: string, currentEmail: string, supabaseClient?: any): Promise<string | null> {
+    const client = supabaseClient || supabase;
+
     if (!code) return null;
     const upperCode = code.toUpperCase();
 
     // LOGIC A: Community Referrals (CR-*)
     if (upperCode.startsWith('CR-')) {
-        const { data: comData, error: comError } = await supabase
+        const { data: comData, error: comError } = await client
             .from('community_referrers')
             .select('id, email, status')
             .eq('referral_code', upperCode)
@@ -101,7 +103,7 @@ export async function validateReferralCode(code: string, currentEmail: string): 
     }
 
     // LOGIC B: Student Referrals (ZTF-*)
-    const { data: refCodeData, error: refError } = await supabase
+    const { data: refCodeData, error: refError } = await client
         .from('referral_codes')
         .select('applicant_id, applicants(email)')
         .eq('code', upperCode)
